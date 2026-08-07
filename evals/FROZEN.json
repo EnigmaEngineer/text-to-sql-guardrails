@@ -1,0 +1,7 @@
+{
+  "frozen_on": "2026-08-07",
+  "sha256": "8d97567d56654d73435da2e75d41949ec1cbc4e0b8bf1e75087b376bd14ba2b9",
+  "questions": 30,
+  "answerable": 22,
+  "note": "Frozen on P10 day 1, before any generation code existed. q006 had its threshold moved from 800 to 500 before this hash was written, because the original returned zero rows and an empty gold answer is scored correct by any query that returns nothing. No question changes after this point."
+}
