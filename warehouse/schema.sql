@@ -2,8 +2,9 @@
 -- Written for DuckDB. warehouse/schema_snowflake.sql carries the same model in
 -- Snowflake types, because there is no Snowflake account to verify against yet.
 --
--- The table count is the point. Eighteen tables is already too many to paste into a
--- prompt on every question, which is what day 2 has to fix.
+-- The table count is meant to be awkward rather than large. Eighteen tables render in
+-- 2,716 characters, measured on 2026-08-07, which fits in any prompt worth using. Day 2
+-- measured retrieval against that and found it does not pay here. See docs/adr-0005.
 
 CREATE SCHEMA IF NOT EXISTS retail;
 
