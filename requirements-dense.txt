@@ -1,0 +1,10 @@
+# Only retrieval/dense.py needs these and it is roughly 500 MB of wheels plus a
+# 130 MB model download. Everything else works without them, and the report says
+# out loud when it ran without them rather than quietly printing a shorter table.
+#
+# On a CPU only machine install torch from the cpu index first. The default PyPI
+# wheel carries CUDA and is far larger.
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0
+sentence-transformers==5.7.0
+numpy==1.26.4
