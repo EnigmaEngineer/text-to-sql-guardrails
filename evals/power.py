@@ -39,3 +39,41 @@ def describe(n_questions, n_by_answer, alpha=0.05):
         "that is %.1f percent of the set, and a smaller real effect is undetectable here"
         % (n_questions, n_by_answer, k, alpha, 100.0 * k / n_questions)
     )
+
+
+def paired_permutation(a, b):
+    """Exact two sided sign flip test over paired per question scores.
+
+    Lives here rather than in a report script for the reason recorded on 08-06. Nothing
+    in tests/ imports a script, so a decision rule that lives in scripts/ cannot be
+    killed by a mutant. This rule decides whether a difference between two retrievers
+    gets stated as a result or as noise, so it is exactly the kind of thing that needs to
+    be falsifiable.
+
+    Enumerates every sign assignment rather than sampling, which is honest at these sizes
+    and refuses rather than guessing above the cap.
+    """
+    import itertools
+
+    if len(a) != len(b):
+        raise ValueError("paired test needs equal length vectors, got %d and %d"
+                         % (len(a), len(b)))
+    diffs = [y - x for x, y in zip(a, b)]
+    nonzero = [d for d in diffs if d]
+    k = len(nonzero)
+    if k == 0:
+        return {"differing": 0, "net": 0, "p_floor": 1.0, "p": 1.0}
+    if k > 20:
+        raise ValueError("%d differing pairs is too many to enumerate exactly" % k)
+    observed = abs(sum(nonzero))
+    hits = total = 0
+    for signs in itertools.product((1, -1), repeat=k):
+        total += 1
+        if abs(sum(s * d for s, d in zip(signs, nonzero))) >= observed:
+            hits += 1
+    return {
+        "differing": k,
+        "net": sum(nonzero),
+        "p_floor": p_floor(k),
+        "p": hits / total,
+    }
