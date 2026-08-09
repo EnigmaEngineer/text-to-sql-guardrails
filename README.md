@@ -42,7 +42,12 @@ retrieval/lexical.py     idf weighted word overlap, no model
 retrieval/dense.py       bge-small over the same table text
 retrieval/graph.py       join edges inferred from primary key naming
 retrieval/select.py      top k, join expansion, and what the prompt costs
-docs/adr-000*.md         five decisions, with what each one costs
+agent/role.py            the read-only role, and the gate that has to sit in front of it
+agent/prompt.py          prompt construction, in named sections that can be measured
+agent/generate.py        the generator interface, and parsing what comes back
+agent/pipeline.py        one question in, one attempt out, every step recorded
+scripts/role_probe.py    what a read-only connection actually blocks
+docs/adr-000*.md         six decisions, with what each one costs
 ```
 
 ## Measured on 2026-08-07
@@ -193,7 +198,114 @@ The ones worth naming. Keeping CTE names as tables. Counting a partial hit as co
 Breaking ties by catalog order rather than by name. A one sided permutation test. Flipping
 the ties along with the differences. Dropping the plural stripper.
 
+## Day 3, measured on 2026-08-09
+
+Every figure below was produced by a script in this repo on that date. The commands are
+named beside them so they can be re-run rather than trusted.
+
+**A read-only connection is not a read-only process.** `python3 scripts/role_probe.py`
+runs each statement against a read-only copy of the warehouse. Anything refused is then
+retried against a writable copy, so a refusal caused by bad SQL in the probe is reported
+as invalid rather than counted as a protection.
+
+| statement | read-only connection |
+|---|---|
+| INSERT, UPDATE, DELETE, CREATE, DROP, ALTER | blocked |
+| CREATE TEMP TABLE, SET memory_limit | allowed |
+| `COPY (SELECT ...) TO 'file.csv'` | **allowed** |
+| `EXPORT DATABASE 'dir'` | **allowed** |
+| `read_csv('/etc/hostname')` | **allowed** |
+| `INSTALL httpfs` then `LOAD httpfs` | **allowed** |
+| `SELECT 1; COPY (...) TO 'file.csv'` | **allowed** |
+
+Five of the fifteen statements probed were allowed and act outside the database. The
+read-only role protects the warehouse. It does not protect the data in it.
+
+`EXPORT DATABASE` on the read-only connection wrote 23 files to disk covering all 208,969
+rows. The stacked statement returned a row count and left a file holding 4,000 customer
+email addresses. Two of the eval set's refusal questions are tagged `pii_export`.
+
+So the connection is the second layer. The first is a gate that asks DuckDB to serialize
+the SQL and approves it only when the serializer succeeds and there is exactly one
+statement. See `docs/adr-0006-read-only-is-not-enough.md`.
+
+**Prompt size**, from `python3 scripts/generation_report.py`, over the 22 answerable
+questions. Min 3,292 characters, mean 3,304, max 3,317. The schema block is 2,716 of that
+and does not vary, because retrieval is off by default per `adr-0005`.
+
+**Refusal coverage.** Eight questions expect a refusal and three of them are reachable by
+anything built so far.
+
+| reason | questions | status | needs |
+|---|---|---|---|
+| write_operation | 3 | covered | day 3, the gate |
+| not_in_schema | 1 | open | day 4, static validation |
+| unbounded_scan | 2 | open | day 5, the cost ceiling |
+| pii_export | 2 | open | nothing designed yet |
+
+The three covered ones were run through the pipeline with the obvious write SQL for each
+and all three came back refused. That SQL was written by hand, so it demonstrates the gate
+and does not measure a model.
+
+**There is no accuracy number here and there will not be one until day 7.** No language
+model is reachable from the environment this repo is built in. Generation runs through
+`ScriptedGenerator`, which replays the frozen gold SQL. The 22 of 22 that
+`generation_report.py` prints is a statement about the plumbing and about nothing else.
+
+## What day 3 got wrong
+
+**The role probe reported three protections that had not been tested.** The first version
+had INSERT, UPDATE and COPY coming back refused, and the reason in each case was a binder
+error about a column that does not exist. The SQL in the probe was malformed. All three
+fail the same way on a writable connection, so the probe was reporting the read-only role
+blocking statements it had never actually been shown. Rewritten to retry every refusal
+against a writable copy and label it `INVALID` when both refuse. Fixing that flipped
+`COPY TO file` from blocked to allowed, which is the finding the whole day rests on.
+
+**A test asserted the wrong refusal reason and it was the test that was wrong.** The
+stacked exfiltration comes back as `not_a_read`, not `multiple_statements`, because the
+serializer fails on the whole string as soon as one statement in it is not a SELECT. The
+query is still refused. `multiple_statements` only fires when every statement is a read,
+which the two-select check covers.
+
+**The question splitter broke on a question containing the word it splits on.** A question
+reading "What does Question: mean in the ticket table?" came back as "mean in the ticket
+table?". It now anchors on the blank line between prompt sections. The fixture that caught
+it was written because a marker that can appear in the payload is the obvious thing to get
+wrong, and it caught it on the first run.
+
+**A duplicate class name.** `NotConfigured` was written twice in one module, once as an
+exception and once as a generator, so the second silently replaced the first. Caught by
+reading the file before running it.
+
+**The probe under-reported what it had written.** It listed files with `os.listdir`, and
+`EXPORT DATABASE` writes a directory, so the row that dumps the entire warehouse showed as
+having left nothing behind.
+
+## Mutation, day 3
+
+14 mutants over the new modules, 13 killed. The survivor renames a local variable and is
+the control.
+
+The ones worth naming. Dropping the zero statement check. Dropping the multiple statement
+check. Collapsing `unparseable` into `not_a_read`. Reverting the question splitter to the
+bare marker, which is today's bug turned into a regression test. Testing the refusal token
+by substring instead of equality. Reporting a gate refusal as an execution failure.
+
 ## Known limitations
+
+**No model has ever been called.** There is no API key and no local weights in the
+environment this repo is built in, so `agent/generate.py` ships three fixtures and a
+backend that refuses. Nothing here says anything about how well a model writes SQL.
+
+**Nothing stops a PII read.** `SELECT customer_email FROM retail.dim_customer` is a single
+read, it passes the gate cleanly, and it is what question q026 asks for. A column level
+policy is the obvious answer and it is on no day of the plan.
+
+**Extension loading is allowed and was not pursued.** `INSTALL httpfs` and `LOAD httpfs`
+both succeed on the read-only connection. Whether a remote file sink then works from this
+sandbox was not tested, because testing outbound exfiltration is not a thing to do
+casually. The claim here is only that the extension loads.
 
 **The Snowflake path has never run.** `adapter.snowflake()` carries `verified = False` and
 a test asserts it. Every number in this repo comes from DuckDB.
@@ -252,8 +364,9 @@ says anything about real retail data.
 ## Mutation
 
 The test suite is checked by breaking things on purpose. Day 1 ran 12 mutants and killed
-11. Day 2 ran 14 more over the new modules and killed 13. Both survivors are deliberate
-no-op controls, there to prove the runner is not failing everything it is handed.
+11. Day 2 ran 14 more over the new modules and killed 13. Day 3 ran 14 more and killed 13.
+All three survivors are deliberate no-op controls, there to prove the runner is not
+failing everything it is handed.
 
 The one real survivor on the day 1 pass was the cell ordering mutant above. It is now
 killed.
