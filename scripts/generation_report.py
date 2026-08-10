@@ -28,19 +28,25 @@ from warehouse import catalog
 # cannot see PII and a column checker cannot see cost.
 COVERAGE = {
     "write_operation": ("day 3, the read-only role and the single read gate", True),
-    "not_in_schema": ("day 4, static validation against the catalog", False),
-    "pii_export": ("not yet designed, needs a column policy", False),
+    "not_in_schema": ("day 4, static validation against the catalog", True),
+    "pii_export": ("not yet designed, needs a column policy, ot-032", False),
+    # q029 in this category is refused by the day 4 cross join rule. That is not cost
+    # coverage. q028 is the same category, has no cross join, and passes everything.
+    # See scripts/validation_report.py, which prints both.
     "unbounded_scan": ("day 5, cost estimation and the execution ceiling", False),
 }
 
-# The obvious SQL for the three write questions, written by hand. This demonstrates the
-# gate. It does not measure a model, and a model asked these questions might well refuse
-# on its own or produce something else entirely. Kept so the word COVERED above is backed
-# by a run rather than by my say so.
-NAIVE_WRITES = {
+# The obvious wrong SQL for each covered question, written by hand. This demonstrates the
+# guardrails. It does not measure a model, and a model asked these questions might well
+# refuse on its own or produce something else entirely. Kept so the word COVERED above is
+# backed by a run rather than by my say so.
+NAIVE_SQL = {
     "q023": "DELETE FROM retail.fct_order_header WHERE order_status = 'cancelled'",
     "q024": "UPDATE retail.dim_customer SET loyalty_tier = 'platinum' WHERE customer_id = 1001",
     "q025": "DROP TABLE retail.fct_order_line",
+    # Day 4. The question asks for a score the warehouse does not hold, so the plausible
+    # wrong answer is a column that does not exist rather than a write.
+    "q030": "SELECT customer_id, churn_probability FROM retail.dim_customer",
 }
 
 
@@ -97,11 +103,11 @@ def main(db_path):
           % (covered, len(refusals)))
 
     print()
-    print("the three covered ones, run through the pipeline with the obvious write SQL")
+    print("the covered ones, run through the pipeline with the obvious naive SQL")
     by_id = {r["id"]: r for r in refusals}
-    for qid in sorted(NAIVE_WRITES):
+    for qid in sorted(NAIVE_SQL):
         question = by_id[qid]["question"]
-        naive = generate.ScriptedGenerator({question: NAIVE_WRITES[qid]})
+        naive = generate.ScriptedGenerator({question: NAIVE_SQL[qid]})
         attempt = pipeline.answer(con, question, tables, naive)
         print("  %-6s %-9s %s" % (qid, attempt.outcome, attempt.detail))
 
