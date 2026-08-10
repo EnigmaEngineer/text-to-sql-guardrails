@@ -357,9 +357,33 @@ no cross join in it and nothing built so far touches it.
 
 **One door.** `agent/guard.py` composes gate then validation and is the only path from
 generated SQL to the connection. `role.run` was deleted rather than left as a second door.
-`tests/test_guard.py` walks `agent/` with `ast` and fails if any `.execute()` outside
+`tests/structural.py` walks `agent/` with `ast` and fails if any `.execute()` outside
 `guard.py` is handed anything but a string literal, because a literal cannot be model
 output. A mutant that added `con.execute(sql)` to the pipeline broke 7 checks.
+
+## Testing the tests
+
+The one door check is the most important thing in the suite and for one day it was the
+only thing here whose behaviour had never been demonstrated by anything but a person
+trying it once. A mutant that pulled its teeth out survived, which is what happens when
+nothing tests a test.
+
+The detectors now live in `tests/structural.py` as ordinary functions over a path, and
+`tests/fixtures/` holds small modules with defects planted in them and marked `# DEFECT`.
+`tests/test_structural.py` asserts that the detector finds every marker and stays quiet
+on the clean fixture. The manual demonstration became a check that runs every time.
+
+Half of those fixtures exist for the opposite case, which is a detector handed nothing to
+look at. There is a directory with no python in it, one holding nothing but the door, and
+a module that makes no calls at all. Each must raise rather than report clean. Four checks
+in this repo and its tooling have already passed by looking at nothing, most recently the
+day 4 validator, which found no base tables in a query that read the host filesystem and
+reported no problem.
+
+Two things fell out of building it. A mutation run showed the string half of "must be a
+string literal" was carrying no weight, because no fixture passed a constant that was not
+a string. And the report was sorted as text, so a defect on line 23 was listed above one
+on line 9. Both are fixed and both are now pinned by a fixture.
 
 ## What day 4 got wrong
 
@@ -398,6 +422,10 @@ must survive for the run to mean anything. The test uses a unique temporary dire
 that removes the string literal check from the one door test. Nothing tests a test, so
 that second survivor is expected. What it would have caught was verified directly instead,
 by adding a real second door to the pipeline and watching 7 checks go red.
+
+A later pass moved the detector into `tests/structural.py` and put fixtures under it. 14
+mutants over the detector, 13 killed, and the one survivor is the control. The two that
+had to be fixed rather than tested are described under "Testing the tests" above.
 
 Named ones that were killed. Allowing `read_csv` through the table function set. Dropping
 the `no_relation` finding. Accepting every bare column. Treating output aliases as unbound
@@ -488,8 +516,9 @@ says anything about real retail data.
 
 The test suite is checked by breaking things on purpose. Day 1 ran 12 mutants and killed
 11. Day 2 ran 14 more over the new modules and killed 13. Day 3 ran 14 more and killed 13.
-Day 4 ran 17 and killed 15. Every one of those survivors is a deliberate control except
-the day 4 mutant of a test, which is described above.
+Day 4 ran 17 and killed 15, then 14 more over the structural detector and killed 13. Every
+one of those survivors is a deliberate control except the day 4 mutant of a test, which is
+what the detector was pulled into its own module to fix.
 
 The one real survivor on the day 1 pass was the cell ordering mutant above. It is now
 killed.
