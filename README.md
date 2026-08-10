@@ -4,15 +4,16 @@ Ask a question in English, get SQL, and have the agent refuse the query before i
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 2 of 7. There is no agent yet. What exists is the warehouse it will query and the
-frozen question set it will be judged on. Day 2 adds a schema retrieval layer and the
-measurement showing it does not pay on a schema this size.
+Day 4 of 7. The agent runs end to end against a scripted generator, because no model is
+reachable from the environment this is built in. Day 4 adds static validation against the
+live catalog and the measurement showing what the day 3 gate was letting through.
 
 ```
 python3 scripts/build_warehouse.py  --db /tmp/wh.duckdb
 python3 scripts/check_gold.py       --db /tmp/wh.duckdb
 python3 -m tests.run_all            --db /tmp/wh.duckdb
 python3 scripts/retrieval_report.py --db /tmp/wh.duckdb --json /tmp/r.json
+python3 scripts/validation_report.py --db /tmp/wh.duckdb --json /tmp/v.json
 ```
 
 `requirements.txt` is duckdb and matplotlib. The embedding scorer needs
@@ -46,8 +47,11 @@ agent/role.py            the read-only role, and the gate that has to sit in fro
 agent/prompt.py          prompt construction, in named sections that can be measured
 agent/generate.py        the generator interface, and parsing what comes back
 agent/pipeline.py        one question in, one attempt out, every step recorded
+agent/validate.py        static validation against the catalog the query will run on
+agent/guard.py           gate then validate, the only door to the connection
 scripts/role_probe.py    what a read-only connection actually blocks
-docs/adr-000*.md         six decisions, with what each one costs
+scripts/validation_report.py  what each layer catches, and what ran without it
+docs/adr-000*.md         seven decisions, with what each one costs
 ```
 
 ## Measured on 2026-08-07
@@ -292,6 +296,114 @@ check. Collapsing `unparseable` into `not_a_read`. Reverting the question splitt
 bare marker, which is today's bug turned into a regression test. Testing the refusal token
 by substring instead of equality. Reporting a gate refusal as an execution failure.
 
+## Day 4, measured on 2026-08-10
+
+Static validation against the catalog, plus the injection check the blueprint asks for.
+Rebuild every number below with:
+
+```
+python3 scripts/build_warehouse.py    --db /tmp/wh.duckdb
+python3 -m tests.run_all              --db /tmp/wh.duckdb
+python3 scripts/validation_report.py  --db /tmp/wh.duckdb --json /tmp/v.json
+python3 scripts/validation_chart.py   --json /tmp/v.json
+```
+
+**The day 3 gate approves a query that reads the host filesystem.** It is a single SELECT,
+so it serializes, so the gate says yes and the read-only connection runs it.
+
+```
+list the filesystem     gate allows   ran, 95 rows, first cell '/etc/.pwd.lock'
+read a host file as text gate allows  ran, 1 rows, first cell '/etc/hostname'
+```
+
+The day 3 probe had already recorded that `read_csv` on a path works on a read-only
+connection. The gate written the same day was never pointed at it.
+
+![what each layer catches](docs/gate_vs_validation.png)
+
+Over 17 probe queries, the day 3 gate alone approves 14. Static validation refuses 12 of
+those 14. The two it lets through are correct queries and it should.
+
+**The obvious validator would not have caught the worst one.** A table function is not a
+`BASE_TABLE` in the parse tree, so a check that walks base tables and looks each one up
+finds an empty list and reports no problem. The most dangerous query in the set gives the
+check the least to do. So `no_relation` is a finding here. A query that reads no table in
+the warehouse is refused, `SELECT 42` included.
+
+**What it refuses, by code.**
+
+| code | what it means |
+|---|---|
+| `table_function` | `read_csv`, `glob`, `read_text` and anything else that reads a path |
+| `unknown_table` | a base table that is not in the catalog |
+| `unknown_column` | a column that is not in the table it is attributed to |
+| `cross_join` | an explicit cross join, or a comma join, over warehouse tables |
+| `implicit_join` | a natural join, whose keys change when a column is added |
+| `unrelated_join` | a join whose condition does not mention both sides |
+| `no_relation` | the query reads nothing in the warehouse |
+| `unparseable` | it will not parse, reported rather than raised |
+
+**Cost.** `guard.approve` over the 22 gold queries is 12.56 ms, which is 0.571 ms per
+query and 51.2 percent of the 24.54 ms it takes to run the same 22. That ratio is a
+statement about a warehouse where the average query finishes in about a millisecond. On
+anything with real data in it the approval cost stops mattering. Timings taken 2026-08-10
+on the sandbox and only the ratio survives a different machine.
+
+**Refusal coverage on the frozen eval set is 4 of 8, up from 3.** `q030` asks for a churn
+score the warehouse does not hold and is now refused as `unknown_column`. `q029` is also
+refused, by the cross join rule, and it is labelled `unbounded_scan`. Counting that as
+cost coverage would be claiming a day 5 result on day 4. `q028` is the same category with
+no cross join in it and nothing built so far touches it.
+
+**One door.** `agent/guard.py` composes gate then validation and is the only path from
+generated SQL to the connection. `role.run` was deleted rather than left as a second door.
+`tests/test_guard.py` walks `agent/` with `ast` and fails if any `.execute()` outside
+`guard.py` is handed anything but a string literal, because a literal cannot be model
+output. A mutant that added `con.execute(sql)` to the pipeline broke 7 checks.
+
+## What day 4 got wrong
+
+**The first column rule refused 6 of the 22 gold queries.** All six the same way:
+
+```sql
+SELECT s.store_name, count(*) AS orders
+FROM   retail.fct_order_header h
+JOIN   retail.dim_store s ON s.store_id = h.store_id
+GROUP  BY s.store_name
+ORDER  BY orders DESC
+```
+
+`orders` is bound by the statement and will never be in the catalog. A guardrail that
+refuses more than a quarter of correct queries does not get tightened. It gets switched
+off, and then it protects nothing. Output aliases are now collected in the same walk.
+
+**Three test queries were written against columns that do not exist.** The schema uses
+`customer_id` and `order_status` and the fixtures said `customer_key` and `status`. The
+validator was right and the tests were wrong, which is the good version of that failure.
+
+**A mutant that let cross joins through survived.** Two branches produced the same code,
+one for an explicit cross join and one for a join with no condition, so a test asserting
+only the code could not tell which fired. The tests assert the detail now. Checking why
+then showed the second branch is unreachable, because `a JOIN b` with no `ON` and no
+`USING` is a syntax error. It was deleted.
+
+**The mutation run exfiltrated 4,001 customer emails and then poisoned itself.** The
+mutant that executed a refused verdict wrote them to the fixed path a test asserts is
+absent. Every mutant after it looked killed, including the control, which is the one that
+must survive for the run to mean anything. The test uses a unique temporary directory now.
+
+## Mutation, day 4
+
+17 mutants, 15 killed. The two survivors are the control, which rewords a comment, and one
+that removes the string literal check from the one door test. Nothing tests a test, so
+that second survivor is expected. What it would have caught was verified directly instead,
+by adding a real second door to the pipeline and watching 7 checks go red.
+
+Named ones that were killed. Allowing `read_csv` through the table function set. Dropping
+the `no_relation` finding. Accepting every bare column. Treating output aliases as unbound
+names. Reporting `ok` regardless of findings. Executing a refused verdict. Skipping the
+gate refusal branch so validation ran first.
+
 ## Known limitations
 
 **No model has ever been called.** There is no API key and no local weights in the
@@ -299,8 +411,19 @@ environment this repo is built in, so `agent/generate.py` ships three fixtures a
 backend that refuses. Nothing here says anything about how well a model writes SQL.
 
 **Nothing stops a PII read.** `SELECT customer_email FROM retail.dim_customer` is a single
-read, it passes the gate cleanly, and it is what question q026 asks for. A column level
-policy is the obvious answer and it is on no day of the plan.
+read over a real table and a real column, so it passes the gate and it passes static
+validation too. It is what question q026 asks for. A column level policy is the obvious
+answer and it is on no day of the plan. Day 4 made this gap narrower and not smaller.
+
+**Static validation checks names and not types.** `CAST(customer_email AS INTEGER)` is
+approved by both layers and fails at execution. That outcome is reported as `failed`
+rather than `refused`, because day 6 has to send a different correction back for each.
+
+**Bare columns under a CTE or a subquery are skipped, not checked.** Those names can be
+bound inside the query and resolving them properly means implementing name resolution.
+Over the answer key it is 112 column references checked and 8 skipped. The count is
+printed rather than hidden, because a validator that quietly stops checking is worse than
+one that says how much it looked at.
 
 **Extension loading is allowed and was not pursued.** `INSTALL httpfs` and `LOAD httpfs`
 both succeed on the read-only connection. Whether a remote file sink then works from this
@@ -365,8 +488,8 @@ says anything about real retail data.
 
 The test suite is checked by breaking things on purpose. Day 1 ran 12 mutants and killed
 11. Day 2 ran 14 more over the new modules and killed 13. Day 3 ran 14 more and killed 13.
-All three survivors are deliberate no-op controls, there to prove the runner is not
-failing everything it is handed.
+Day 4 ran 17 and killed 15. Every one of those survivors is a deliberate control except
+the day 4 mutant of a test, which is described above.
 
 The one real survivor on the day 1 pass was the cell ordering mutant above. It is now
 killed.
