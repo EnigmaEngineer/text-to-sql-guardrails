@@ -111,12 +111,7 @@ def inspect(con, sql):
     return Decision(True, "single_read", "", 1, node_types)
 
 
-def run(con, sql):
-    """Gate, then execute. Nothing in this project should call `con.execute` directly.
-
-    Returns (rows, decision) so a caller that wants the trace does not have to ask twice.
-    """
-    decision = inspect(con, sql)
-    if not decision.allowed:
-        raise Refused(decision)
-    return con.execute(sql).fetchall(), decision
+# There used to be a `run` here that gated and then executed. It was removed on day 4.
+# It was a second way into the database that knew about the parser and not about the
+# catalog, so `agent.validate` would have had to be added in two places and one of them
+# would eventually have been missed. `agent.guard.execute` is the only door now.

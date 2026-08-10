@@ -1,10 +1,11 @@
 """One question in, one attempt out, with every step recorded.
 
-This is the spine days 4 to 6 hang off. Day 4 adds static validation between the parse
-and the gate. Day 5 adds a cost estimate after the gate and before execution. Day 6 loops
-this whole thing when a step fails. The steps are recorded in a list rather than logged,
-because the trace viewer is a deliverable and reconstructing a trace from log lines is
-work nobody enjoys.
+This is the spine days 4 to 6 hang off. Day 4 put static validation behind `agent.guard`
+rather than adding a step here, so the ordering lives next to the thing it protects.
+Day 5 adds a cost estimate after approval and before execution. Day 6 loops this whole
+thing when a step fails. The steps are recorded in a list rather than logged, because the
+trace viewer is a deliverable and reconstructing a trace from log lines is work nobody
+enjoys.
 
 There is deliberately no retry here yet. Day 6 owns that, and writing an empty retry loop
 today so it looks finished is the padding this program's audit asks about.
@@ -12,7 +13,7 @@ today so it looks finished is the padding this program's audit asks about.
 
 from dataclasses import dataclass, field
 
-from agent import generate, prompt as prompt_mod, role
+from agent import generate, guard, prompt as prompt_mod
 
 
 @dataclass
@@ -23,12 +24,13 @@ class Attempt:
     rows: tuple = ()
     outcome: str = ""
     detail: str = ""
+    verdict: object = None
 
     def step(self, name, ok, detail=""):
         self.steps.append({"step": name, "ok": ok, "detail": detail})
 
     def as_dict(self):
-        return {
+        out = {
             "question": self.question,
             "outcome": self.outcome,
             "detail": self.detail,
@@ -36,6 +38,9 @@ class Attempt:
             "row_count": len(self.rows),
             "steps": list(self.steps),
         }
+        if self.verdict is not None:
+            out["verdict"] = self.verdict.as_dict()
+        return out
 
 
 def answer(con, question, tables, generator, chosen=None):
@@ -44,14 +49,16 @@ def answer(con, question, tables, generator, chosen=None):
     Outcomes are a closed set and every caller downstream switches on them, so they are
     listed here rather than left for a reader to collect from the branches.
 
-        answered        the query passed the gate and ran
+        answered        the query was approved and ran
         cannot_answer   the generator declined
-        refused         the gate rejected the SQL, `detail` says which rule
-        failed          the SQL passed the gate and the database rejected it
+        refused         the gate or the validator rejected it, `detail` says which rule
+        failed          the SQL was approved and the database rejected it anyway
 
-    A gate refusal and a database error are kept apart because day 6 has to send
-    different things back to the model, and because collapsing them would hide the case
-    where the gate approves something that cannot run.
+    A refusal and a database error are kept apart because day 6 has to send different
+    things back to the model, and because collapsing them would hide the case where both
+    layers approve something that cannot run. That case is the point of the `failed`
+    outcome and it is not hypothetical. Static validation checks that names exist and
+    says nothing about types.
     """
     attempt = Attempt(question=question)
 
@@ -81,18 +88,26 @@ def answer(con, question, tables, generator, chosen=None):
     attempt.sql = sql
     attempt.step("parse", True, "%d chars of SQL" % len(sql))
 
-    decision = role.inspect(con, sql)
-    attempt.step("gate", decision.allowed, decision.reason)
-    if not decision.allowed:
-        attempt.outcome, attempt.detail = "refused", decision.reason
+    # One call, so the query is approved once rather than once for the trace and again
+    # for the run. The verdict carries both layers, which is what the steps below read.
+    result = guard.execute(con, tables, sql)
+    verdict = result.verdict
+    attempt.verdict = verdict
+
+    attempt.step("gate", verdict.stage != "gate", verdict.decision.reason)
+    if verdict.stage != "gate":
+        codes = verdict.report.codes() if verdict.report else ()
+        attempt.step("validate", verdict.allowed, ",".join(codes) or "clean")
+    if not verdict.allowed:
+        attempt.outcome, attempt.detail = "refused", verdict.reason
         return attempt
 
-    try:
-        attempt.rows = tuple(con.execute(sql).fetchall())
-    except Exception as exc:
-        attempt.outcome, attempt.detail = "failed", str(exc).splitlines()[0]
-        attempt.step("execute", False, attempt.detail)
+    if not result.ran:
+        attempt.outcome, attempt.detail = "failed", result.error
+        attempt.step("execute", False, result.error)
         return attempt
+
+    attempt.rows = tuple(result.rows)
 
     attempt.step("execute", True, "%d rows" % len(attempt.rows))
     attempt.outcome = "answered"
