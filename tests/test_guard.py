@@ -6,10 +6,10 @@ remember to invoke. The answer here is that there is one door, and the way to ke
 one door is to fail the suite when a second appears.
 """
 
-import ast
 import os
 
 from agent import guard, role, validate
+from tests import structural
 from tests.harness import eq, true
 from warehouse import catalog
 
@@ -103,43 +103,22 @@ def check_model_sql_can_only_reach_the_database_through_guard():
     SQL has exactly one path to the connection, and it fails the moment someone adds a
     second one. Behaviour tests cannot catch that, because the new path would have its
     own passing tests.
+
+    The detector moved to `tests/structural.py` for `ot-034`, so that its own behaviour
+    is covered by `tests/test_structural.py` instead of by a manual demonstration. The
+    scanned count is asserted here as well as there, because this is the call site that
+    would go vacuous if `agent/` ever moved.
     """
-    offenders = []
-    for name in sorted(os.listdir(AGENT_DIR)):
-        if not name.endswith(".py") or name == "guard.py":
-            continue
-        path = os.path.join(AGENT_DIR, name)
-        with open(path) as fh:
-            tree = ast.parse(fh.read(), filename=name)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if not isinstance(func, ast.Attribute) or func.attr != "execute":
-                continue
-            # `guard.execute(...)` is the door itself, not a way round it.
-            if isinstance(func.value, ast.Name) and func.value.id == "guard":
-                continue
-            first = node.args[0] if node.args else None
-            if not isinstance(first, ast.Constant) or not isinstance(first.value, str):
-                offenders.append("%s:%d" % (name, node.lineno))
+    offenders, scanned = structural.execute_offenders(AGENT_DIR)
     eq(offenders, [], "non literal .execute() calls outside guard.py")
+    true(scanned >= 5, "modules scanned in agent/: %d" % scanned)
 
 
 def check_the_validator_is_reachable_from_the_pipeline():
     """A guard nothing calls is decoration. Pinned by import, not by reading the file."""
     from agent import pipeline
 
-    src = os.path.join(AGENT_DIR, "pipeline.py")
-    with open(src) as fh:
-        tree = ast.parse(fh.read())
-    names = {
-        n.func.value.id + "." + n.func.attr
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Call)
-        and isinstance(n.func, ast.Attribute)
-        and isinstance(n.func.value, ast.Name)
-    }
+    names = structural.called_attribute_names(os.path.join(AGENT_DIR, "pipeline.py"))
     true("guard.execute" in names, "pipeline calls guard.execute")
     true(pipeline.guard is guard, "and it is this guard")
     # And it does not reach past the door to either layer on its own.
