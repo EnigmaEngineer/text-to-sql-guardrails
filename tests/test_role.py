@@ -145,19 +145,20 @@ def check_every_gold_query_passes_the_gate(ctx):
         true(d.allowed, "%s gold query passes the gate: %s" % (row["id"], d.reason))
 
 
-def check_run_raises_and_carries_the_decision(ctx):
-    exc = raises(
-        lambda: role.run(ctx.con, "DROP TABLE retail.fct_return"),
-        "not_a_read",
-        "run on a write",
-    )
-    eq(exc.decision.reason, "not_a_read", "decision on the exception")
+def check_the_gate_alone_approves_a_query_that_reads_the_host(ctx):
+    """The day 4 finding, pinned where the day 3 gate lives.
 
-
-def check_run_returns_rows_and_a_decision(ctx):
-    rows, d = role.run(ctx.con, "SELECT 42 AS a")
-    eq(rows, [(42,)], "rows")
-    true(d.allowed, "decision")
+    `read_csv` on a path is a single SELECT, so this layer approves it and is right to.
+    Refusing it is `agent.validate`'s job. The check is here so that anyone reading
+    `role.py` and concluding the gate is the guardrail meets the counterexample in the
+    same file's tests.
+    """
+    for sql in (
+        "SELECT * FROM read_csv('/etc/hostname')",
+        "SELECT * FROM glob('/etc/*')",
+    ):
+        d = role.inspect(ctx.con, sql)
+        true(d.allowed, "the parser gate alone approves %r" % sql)
 
 
 def check_read_only_connection_still_allows_copy(ctx):

@@ -4,18 +4,29 @@ The interesting one is `check_every_stated_rule_is_enforced`. A prompt that list
 nobody checks reads like a control and is not one.
 """
 
-from agent import prompt as prompt_mod, role
+from agent import guard, prompt as prompt_mod, role
 from tests.harness import eq, true, raises
 from warehouse import catalog
 
 # One example of SQL that breaks each rule, in the order the rules are written. A rule
 # with no example here fails the coupling check below rather than passing quietly.
+# Every rule the prompt states must appear here exactly once, as either SQL that gets
+# refused or an explicit note that it is not a SQL rule. On day 3 this was a list of four
+# against a RULES tuple of six, and the check that iterated it was called
+# "every stated rule is enforced". It checked every rule someone had remembered to add.
+# The two it skipped were the schema rule, which day 4 is about, and the refusal token.
+# It now iterates RULES, so a new rule with no enforcement fails the suite.
 BREAKS_RULE = [
     ("Return exactly one", "SELECT 1; SELECT 2"),
     ("must be a SELECT", "DROP TABLE retail.fct_return"),
     ("COPY, EXPORT", "COPY (SELECT 1 AS a) TO '/tmp/x.csv'"),
     ("chain statements", "SELECT 1; SELECT 2"),
+    ("tables and columns", "SELECT nope FROM retail.dim_customer"),
 ]
+
+# A rule that is not about the SQL. It is enforced by the parser in agent.generate and
+# the check below names where, rather than letting it go unaccounted for.
+NOT_SQL_RULES = {"CANNOT_ANSWER": "agent.generate.parse"}
 
 
 def check_prompt_is_deterministic(ctx):
@@ -95,13 +106,28 @@ def check_a_question_containing_the_marker_still_round_trips(ctx):
 
 
 def check_every_stated_rule_is_enforced(ctx):
-    """Each rule in the prompt maps to SQL that the gate really refuses."""
-    rules = prompt_mod.RULES
+    """Each rule in the prompt maps to SQL that is really refused, or is accounted for.
+
+    Driven off `RULES` rather than off the fixture list, so adding a rule to the prompt
+    without enforcing it fails here. That was the hole in the day 3 version of this
+    check and it is the same shape as `ot-026`.
+    """
+    from warehouse import catalog
+
+    tables = catalog.read(ctx.con)
+    unmatched = []
+    for rule in prompt_mod.RULES:
+        fragments = [f for f, _sql in BREAKS_RULE if f in rule]
+        excused = [k for k in NOT_SQL_RULES if k in rule]
+        if len(fragments) + len(excused) != 1:
+            unmatched.append(rule)
+    eq(unmatched, [], "rules with no enforcement entry")
+
     for fragment, sql in BREAKS_RULE:
-        matching = [r for r in rules if fragment in r]
+        matching = [r for r in prompt_mod.RULES if fragment in r]
         eq(len(matching), 1, "exactly one rule mentions %r" % fragment)
-        d = role.inspect(ctx.con, sql)
-        true(not d.allowed, "gate refuses the SQL breaking %r" % fragment)
+        v = guard.approve(ctx.con, tables, sql)
+        true(not v.allowed, "SQL breaking %r is refused" % fragment)
 
 
 def check_the_refusal_token_is_shared_not_retyped(ctx):
