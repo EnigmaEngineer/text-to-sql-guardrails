@@ -4,9 +4,10 @@ Ask a question in English, get SQL, and have the agent refuse the query before i
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 4 of 7. The agent runs end to end against a scripted generator, because no model is
-reachable from the environment this is built in. Day 4 adds static validation against the
-live catalog and the measurement showing what the day 3 gate was letting through.
+Day 5 of 7. The agent runs end to end against a scripted generator, because no model is
+reachable from the environment this is built in. Day 5 adds a cost estimate from `EXPLAIN`
+and a ceiling, plus the measurement showing that the ceiling does not catch the question it
+was aimed at.
 
 ```
 python3 scripts/build_warehouse.py  --db /tmp/wh.duckdb
@@ -14,6 +15,7 @@ python3 scripts/check_gold.py       --db /tmp/wh.duckdb
 python3 -m tests.run_all            --db /tmp/wh.duckdb
 python3 scripts/retrieval_report.py --db /tmp/wh.duckdb --json /tmp/r.json
 python3 scripts/validation_report.py --db /tmp/wh.duckdb --json /tmp/v.json
+python3 scripts/cost_report.py      --db /tmp/wh.duckdb --json /tmp/c.json
 ```
 
 `requirements.txt` is duckdb and matplotlib. The embedding scorer needs
@@ -48,10 +50,12 @@ agent/prompt.py          prompt construction, in named sections that can be meas
 agent/generate.py        the generator interface, and parsing what comes back
 agent/pipeline.py        one question in, one attempt out, every step recorded
 agent/validate.py        static validation against the catalog the query will run on
-agent/guard.py           gate then validate, the only door to the connection
+agent/cost.py            reads a plan, and the ceiling it is judged against
+agent/guard.py           gate then validate then cost, the only door to the connection
 scripts/role_probe.py    what a read-only connection actually blocks
 scripts/validation_report.py  what each layer catches, and what ran without it
-docs/adr-000*.md         seven decisions, with what each one costs
+scripts/cost_report.py   the answer key, the two candidate metrics, and the probes
+docs/adr-000*.md         nine decisions, with what each one costs
 ```
 
 ## Measured on 2026-08-07
@@ -84,7 +88,7 @@ Timings are from one machine on one day. The ratios survive, the milliseconds do
 | expected refusal | count | which guardrail should catch it |
 |---|---|---|
 | write_operation | 3 | read-only role, day 3 |
-| unbounded_scan | 2 | cost ceiling, day 5 |
+| unbounded_scan | 2 | cost ceiling, day 5, and it does not catch them |
 | pii_export | 2 | nothing yet |
 | not_in_schema | 1 | static validation, day 4 |
 
@@ -432,6 +436,132 @@ the `no_relation` finding. Accepting every bare column. Treating output aliases 
 names. Reporting `ok` regardless of findings. Executing a refused verdict. Skipping the
 gate refusal branch so validation ran first.
 
+## Day 5, measured on 2026-08-11
+
+A cost estimate from `EXPLAIN`, and a ceiling that refuses a query before it runs.
+Rebuild every number below with:
+
+```
+python3 scripts/build_warehouse.py --db /tmp/wh.duckdb
+python3 -m tests.run_all           --db /tmp/wh.duckdb
+python3 scripts/cost_report.py     --db /tmp/wh.duckdb --json /tmp/c.json
+python3 scripts/cost_chart.py      --db /tmp/wh.duckdb --out docs/day5_cost_metric.png
+```
+
+**The obvious metric does not work and the second obvious one does not either.** Rows
+returned to the caller is what anyone would want to cap. The plan will not give it. Over
+the 22 gold queries the root node carries no estimate on 9 and reports exactly 0 on
+another 11, against real answers of 4, 12 and 20 rows.
+
+So the ceiling reads work done. Which of two ways is a measurement, not a preference.
+
+| metric | answer key, worst case | inequality join | separation |
+|---|---|---|---|
+| sum of the scan nodes | 70,523 | 104,357 | 1.48x |
+| largest estimate on any node | 64,357 | 223,844,302 | 3,478x |
+
+The inequality join is `fct_order_line JOIN fct_web_session ON l.quantity > s.page_views`.
+Its condition names two real tables, so day 4 approves it. Summing the scans puts it 1.48x
+above the answer key, which is not a gap anything can sit in. The largest single step puts
+it 3,478x above. Same plan, same walk, two numbers.
+
+Ceiling is 208,969, the sum of `duckdb_tables().estimated_size` across the schema. It
+comes off the warehouse rather than out of the eval set on purpose. No question anyone
+types should make the engine handle more rows than the warehouse holds. It lands at 3.2x
+the answer key worst case, which is headroom rather than calibration.
+
+![the metric choice, and the estimate against reality](docs/day5_cost_metric.png)
+
+**The estimate is not an upper bound.** Against DuckDB's own profiler it came in below
+what the query really scanned on 8 of the 22 gold queries, worst at 0.23 of actual. This
+layer refuses accidents. It is not a defence against someone trying.
+
+**It buys no coverage on the eval set, and that is the honest headline.** Two questions
+are tagged `unbounded_scan`. q029 was already refused by the day 4 cross join rule. q028
+asks for every row of `fct_web_session` and estimates at 40,000. q009 is a real question
+that reads the same table with no filter and estimates at 40,000 too. The plans cost the
+same. No ceiling separates them, because what makes q028 unreasonable is the size of the
+answer and that is the number the plan will not give. Refusal coverage stays at 4 of 8.
+
+| after day 5 | refusal coverage |
+|---|---|
+| write_operation | 3 of 3, gate |
+| not_in_schema | 1 of 1, validation |
+| unbounded_scan | 0 of 2 by cost, 1 of 2 counting the day 4 cross join rule |
+| pii_export | 0 of 2, still nothing |
+
+`docs/adr-0009` records the decision and both of the wrong turns below.
+
+## What day 5 got wrong
+
+Three times today a rule looked correct until it met an input the answer key does not
+contain. That is the same mistake day 4 made with the output alias and it arrived in three
+new costumes.
+
+**The unscored operator list was written from memory and both halves were wrong.** It
+named `CROSS_PRODUCT` and `NESTED_LOOP_JOIN`. A `NESTED_LOOP_JOIN` carries an estimate, so
+that entry could never have fired. A join on a function of both sides plans as
+`BLOCKWISE_NL_JOIN`, which carries none and was not in the list. The list is now inverted
+and derived from the answer key. Four operators appear with no estimate across the 22 gold
+queries. They are `ORDER_BY` and `UNGROUPED_AGGREGATE` and `PERFECT_HASH_GROUP_BY` and
+`TOP_N`, and every one of them reduces or preserves rows. Anything else with no estimate is
+refused.
+
+**A correct query was refused for having no scan in its plan.** `SELECT count(*) FROM
+retail.dim_store` plans as one `COLUMN_DATA_SCAN` estimated at 1, because DuckDB answers it
+from metadata and never touches the table. No gold question is a bare count on one table,
+so the answer key check stayed green while this was live. The rule now refuses a plan where
+no node carries a number, which is a different question from whether a table was read.
+
+**The day 4 structural check refused this day's first draft, correctly.** The ceiling was
+first computed by building a `count(*)` per table with string formatting, which is a
+non literal `.execute()` outside `agent/guard.py`. The suite went red on two checks. The
+fix was not an exemption. `duckdb_tables()` gives the same total in one literal statement,
+and `estimated_size` is the number the planner puts on a scan node, so the ceiling and the
+thing measured against it now come from one source.
+
+**Adding a third layer made the trace lie about the second.** The pipeline marked the
+validate step with `verdict.allowed`, which was right while approval had two layers and
+became wrong the moment a cost refusal could follow a clean validation. A query refused on
+cost was reporting validation as failed. Caught by a check that reads the steps rather than
+the outcome.
+
+## Day 4 has a false positive it does not know about
+
+Not fixed today, because it is a day 4 rule and the fix is a design question rather than a
+patch. `unrelated_join` refuses any join whose condition touches fewer than two distinct
+tables. A self join always resolves both aliases to one table, so every self join is
+refused, including this one:
+
+```sql
+SELECT count(*) FROM retail.fct_order_header a
+JOIN retail.fct_order_header b ON a.customer_id = b.customer_id AND a.order_id < b.order_id
+```
+
+That is a repeat purchase question and it is legitimate. No gold query self joins, which is
+why day 4 shipped without seeing it. Same shape as everything above.
+
+## Mutation, day 5
+
+15 mutants over `agent/cost.py`, the cost branches of `agent/guard.py` and the new step in
+`agent/pipeline.py`. 13 killed on the first pass. One survivor was the control. The other
+was real and is now killed, taking it to 14 of 15.
+
+The real survivor flipped the `no_estimate` refusal in `guard.approve` into an approval and
+the whole suite stayed green. The branch is unreachable through the real path, because
+validation refuses a query that reads no table before cost ever sees one. It is still right
+to have, since without it `read_plan` raises out of a `guard.execute` documented never to
+raise. So it got a test that stubs the plan rather than a deletion. That is the opposite
+call from the day 4 survivor, which was an unreachable branch that really should have gone.
+
+Named ones that were killed. Reading the scan sum instead of the largest step. Moving the
+ceiling comparison off by one. Deleting the unscored operator rule. Adding `CROSS_PRODUCT`
+to the safe list. Approving an empty plan. Approving a plan where nothing carries a number.
+Dropping the check that a ceiling is positive. Taking the ceiling from one table instead of
+the schema. Running cost before validation. Skipping cost whenever a ceiling was supplied.
+Dropping the ceiling on the way through `guard.execute`. Reporting the validate step with
+the final verdict.
+
 ## Known limitations
 
 **No model has ever been called.** There is no API key and no local weights in the
@@ -458,8 +588,25 @@ both succeed on the read-only connection. Whether a remote file sink then works 
 sandbox was not tested, because testing outbound exfiltration is not a thing to do
 casually. The claim here is only that the extension loads.
 
+**The cost ceiling reads an estimate, and an estimate is not a bound.** It came in under
+what the query really scanned on 8 of the 22 gold queries. Anything the optimizer
+underestimates walks under the ceiling. This stops accidents.
+
+**Nothing caps the size of the answer.** The plan will not estimate rows returned, so
+`SELECT * FROM retail.fct_web_session` passes every layer. A `LIMIT` injected on approved
+SQL is the obvious answer and it is a change to the query rather than a judgement about it,
+which is a different kind of act and belongs behind a decision rather than in a day 5
+commit.
+
+**Every self join is refused by day 4 and none of them should be.** `unrelated_join` counts
+distinct tables in the join condition, and a self join resolves both aliases to one table.
+No gold query self joins, so this shipped unseen. Found on day 5 and left, because the fix
+is a design question about how to tell a self join from a cartesian product.
+
 **The Snowflake path has never run.** `adapter.snowflake()` carries `verified = False` and
-a test asserts it. Every number in this repo comes from DuckDB.
+a test asserts it. Every number in this repo comes from DuckDB. `cost.read_plan` is written
+against DuckDB's plan document and Snowflake returns a different one, so the cost layer does
+not port either.
 
 **Retrieval loses on this warehouse and it is shipped anyway.** Measured, not argued. See
 `docs/adr-0005`. It is kept because the guardrails on days 3 to 6 need a table set to
