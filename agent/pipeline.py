@@ -1,8 +1,9 @@
 """One question in, one attempt out, with every step recorded.
 
 This is the spine days 4 to 6 hang off. Day 4 put static validation behind `agent.guard`
-rather than adding a step here, so the ordering lives next to the thing it protects.
-Day 5 adds a cost estimate after approval and before execution. Day 6 loops this whole
+rather than adding a step here, so the ordering lives next to the thing it protects. Day
+5 did the same with the cost ceiling and for the same reason, so what this file gained is
+a ceiling to pass and a step to record rather than any logic. Day 6 loops this whole
 thing when a step fails. The steps are recorded in a list rather than logged, because the
 trace viewer is a deliverable and reconstructing a trace from log lines is work nobody
 enjoys.
@@ -43,7 +44,7 @@ class Attempt:
         return out
 
 
-def answer(con, question, tables, generator, chosen=None):
+def answer(con, question, tables, generator, chosen=None, ceiling=None):
     """Build a prompt then generate then gate then execute. Never raises for a bad query.
 
     Outcomes are a closed set and every caller downstream switches on them, so they are
@@ -51,7 +52,7 @@ def answer(con, question, tables, generator, chosen=None):
 
         answered        the query was approved and ran
         cannot_answer   the generator declined
-        refused         the gate or the validator rejected it, `detail` says which rule
+        refused         a guard layer rejected it, `detail` says which rule
         failed          the SQL was approved and the database rejected it anyway
 
     A refusal and a database error are kept apart because day 6 has to send different
@@ -90,14 +91,20 @@ def answer(con, question, tables, generator, chosen=None):
 
     # One call, so the query is approved once rather than once for the trace and again
     # for the run. The verdict carries both layers, which is what the steps below read.
-    result = guard.execute(con, tables, sql)
+    result = guard.execute(con, tables, sql, ceiling)
     verdict = result.verdict
     attempt.verdict = verdict
 
     attempt.step("gate", verdict.stage != "gate", verdict.decision.reason)
     if verdict.stage != "gate":
         codes = verdict.report.codes() if verdict.report else ()
-        attempt.step("validate", verdict.allowed, ",".join(codes) or "clean")
+        attempt.step("validate", verdict.stage != "validate", ",".join(codes) or "clean")
+    if verdict.judgement is not None:
+        judgement = verdict.judgement
+        detail = judgement.detail or "peak %d rows under %d" % (
+            judgement.estimate.peak_rows, judgement.ceiling,
+        )
+        attempt.step("cost", judgement.ok, detail)
     if not verdict.allowed:
         attempt.outcome, attempt.detail = "refused", verdict.reason
         return attempt
