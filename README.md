@@ -48,14 +48,18 @@ retrieval/select.py      top k, join expansion, and what the prompt costs
 agent/role.py            the read-only role, and the gate that has to sit in front of it
 agent/prompt.py          prompt construction, in named sections that can be measured
 agent/generate.py        the generator interface, and parsing what comes back
-agent/pipeline.py        one question in, one attempt out, every step recorded
+agent/pipeline.py        one attempt in `answer`, the correction loop in `solve`
 agent/validate.py        static validation against the catalog the query will run on
 agent/cost.py            reads a plan, and the ceiling it is judged against
 agent/guard.py           gate then validate then cost, the only door to the connection
+agent/correct.py         one retry strategy per refusal code, derived from the source
+agent/trace.py           every attempt and every correction, and a text renderer
+evals/reach.py           which refusal codes anything but a test actually produces
 scripts/role_probe.py    what a read-only connection actually blocks
 scripts/validation_report.py  what each layer catches, and what ran without it
 scripts/cost_report.py   the answer key, the two candidate metrics, and the probes
-docs/adr-000*.md         nine decisions, with what each one costs
+scripts/trace_report.py  the policy, what a retry costs, and what reaches it
+docs/adr-00*.md          ten decisions, with what each one costs
 ```
 
 ## Measured on 2026-08-07
@@ -562,6 +566,127 @@ the schema. Running cost before validation. Skipping cost whenever a ceiling was
 Dropping the ceiling on the way through `guard.execute`. Reporting the validate step with
 the final verdict.
 
+## Day 6, measured on 2026-08-12
+
+Day 6 of the plan is the self correction loop, capped at two retries, and trace capture.
+`agent/pipeline.solve` runs the loop and calls `agent/pipeline.answer` and nothing else,
+so every attempt goes through the same one door as a single attempt does.
+
+```
+python3 scripts/trace_report.py --db /tmp/wh.duckdb
+python3 -m tests.run_all         16 modules, 217 checks, 217 passed
+```
+
+**The retry policy is one strategy per refusal code and the code list is read out of the
+source.** `tests/test_correct.py` walks `agent/` with `ast`, pulls every refusal code
+built from a string literal, and fails when one has no strategy or when a strategy exists
+for a code nothing produces. There are fourteen.
+
+**Three refusals are not coached at all.** `not_a_read`, `multiple_statements` and
+`table_function` end the trace with nothing sent back. That is a security position rather
+than an efficiency one. A write, a chained statement and a host file read are not slips,
+and a correction there hands whatever produced the query another turn at the same target.
+The cost is that a model which wrote a `DELETE` by accident does not get to fix it.
+
+**Only three of the fourteen codes are produced by anything other than a test.**
+
+| | count |
+|---|---|
+| refusal codes the agent can produce | 14 |
+| coached | 11 |
+| carrying a fact the prompt did not | 4 |
+| produced by the eval set rather than by a test | 3 |
+
+The four are `unparseable`, `over_ceiling`, `unscored_operator` and `no_estimate`. Those
+come from the parser and the planner. The other ten are properties of a query read against
+a schema that went into the prompt in full, so the correction points at a mistake rather
+than telling the model anything it could not already have worked out.
+
+`scripts/trace_report.py` prints the reach figure every run, because a strategy for a code
+nothing reaches is an untested decision and it should not be able to hide inside a table
+of fourteen.
+
+**A full retry budget costs about 1.5x a clean run, not 3x.** From
+`scripts/trace_report.py`, median of seven repeats after a discarded warmup, on the 22
+answerable questions. 70.3 ms against 102.6 ms, spread 66.4 to 73.5 and 98.9 to 106.4, a
+ratio of 1.46. A refused attempt is judged and never executed, which is where the missing
+1.5x went. The ratio read 1.46, 1.49 and 1.51 across three passes today and the
+milliseconds moved more than that, because the sandbox varies by roughly 1.8x between
+days. Only the ratio travels.
+
+**The loop stops on a repeat and not only at the cap.** The cap bounds the damage. It does
+not stop a generator that ignores the correction, and a generator that ignores the
+correction returns the same string, which is refused for the same reason by the same
+layer. Four endings are recorded and kept apart: `resolved`, `stopped_unretryable`,
+`stopped_repeated` and `stopped_at_cap`.
+
+**The trace renders as text, not as a Streamlit app.** The plan names Streamlit. There is
+no browser in the environment this repo is built in, and a component that has never run is
+worse than an absent one. `docs/adr-0010` records that with the rest of the day.
+
+```
+attempt 1 of 3
+  sql      SELECT favourite_colour FROM retail.dim_customer
+  prompt   ok    3270 chars
+  gate     ok    single_read
+  validate FAIL  unknown_column
+  outcome  refused (unknown_column)
+  -> sent back: unknown_column: favourite_colour is not a column of dim_cus...
+
+attempt 2 of 3
+  sql      SELECT count(*) AS n FROM retail.dim_customer
+  prompt   ok    3486 chars, 214 of correction
+  validate ok    clean
+  execute  ok    1 rows
+  outcome  answered (1 rows)
+
+ending   resolved after 1 retry(s)
+```
+
+![the correction policy and what reaches it](docs/day6_policy.png)
+
+## What day 6 got wrong
+
+**A report announced PII coverage this project does not have, on the strength of a typo.**
+`evals/reach.py` runs a hand written plausible query for each of the eight refuse-tagged
+questions. The first version asked `dim_customer` for `customer_name` and `dim_employee`
+for `employee_name`. Both tables call that column `full_name`. So q026 and q027 came back
+refused as `unknown_column` and the report counted them as covered, while the limitations
+section below says plainly that nothing here stops a PII read. A name error was reading as
+a control. `Reach.suspect` now flags any name error outside the one question tagged
+`hallucination`, and a check runs every plausible query through the validator.
+
+**A retry cost was measured once and reported as 1.20x.** The first `solve` of a process
+pays for the catalog read and the planner warming, and that landed entirely on the single
+attempt arm because it ran first. Warmed up and repeated seven times it is about 1.5x.
+
+**A test compared two broken things and passed.** The check that an empty correction does
+not change the prompt built one prompt with no correction and one with an empty string,
+then asserted they matched. Both carried the mutation, so it passed against the mutant it
+was written for. It now asserts on the text, where a dropped section shows up as a longer
+run of newlines. That is an eighth distinct way something has passed here while being
+wrong.
+
+**The refusal coverage figure depends on an unstated convention.** The repo has been
+quoting 4 of 8. Five of the eight are refused by something. The difference is q029, which
+is labelled `unbounded_scan` and is stopped by the day 4 cross join rule, so the reading
+that counts a question as covered only when the layer matching its label catches it gives
+4 and the reading that counts any refusal gives 5. Both are now printed side by side, with
+the reason, so the number cannot be quoted without the convention attached.
+
+## Mutation, day 6
+
+Thirty mutants in two rounds, over the six modules day 6 touched. The first round of
+seventeen killed all seventeen. That was too clean to believe, so a second round of
+thirteen was aimed at code the first had not touched. Six survived it and none was an
+unreachable branch.
+
+Two of the six were the day 5 shape, which is a branch contributing nothing today that
+must stay anyway. Both got a stubbed test rather than a deletion. One is the loop running
+the answer key through the guard. It fires only when a guardrail starts refusing correct
+queries. The other is the second entry in `NAME_ERROR_CODES`, which nothing currently
+trips. After the six fixes both rounds kill everything.
+
 ## Known limitations
 
 **No model has ever been called.** There is no API key and no local weights in the
@@ -575,7 +700,24 @@ answer and it is on no day of the plan. Day 4 made this gap narrower and not sma
 
 **Static validation checks names and not types.** `CAST(customer_email AS INTEGER)` is
 approved by both layers and fails at execution. That outcome is reported as `failed`
-rather than `refused`, because day 6 has to send a different correction back for each.
+rather than `refused`, and day 6 sends a different correction back for each.
+
+**Eleven of the fourteen correction strategies have never met a real input.** They are
+reachable, so this is not dead code. It is eleven untested decisions about what to tell a
+model, and nothing in the eval set exercises any of them. Widening the eval set is the
+honest fix and day 7 does not have room for it.
+
+**The corrections have never been read by a model.** `SequenceGenerator` answers from a
+list and ignores what it is told. So the loop, the trace and the four stopping rules are
+exercised on real refusals from real layers, and whether a correction actually helps is
+not measured anywhere in this repo. No number here claims it does.
+
+**A self join is still refused and none should be.** The `unrelated_join` rule counts
+distinct real tables in a join condition, and a self join resolves both aliases to one
+table. `fct_order_header a JOIN fct_order_header b ON a.customer_id = b.customer_id AND
+a.order_id < b.order_id` is a repeat purchase question and it is refused. No gold query
+self joins, so the answer key check did not see it. The direction is the safe one, since
+it refuses correct queries rather than approving dangerous ones.
 
 **Bare columns under a CTE or a subquery are skipped, not checked.** Those names can be
 bound inside the query and resolving them properly means implementing name resolution.
