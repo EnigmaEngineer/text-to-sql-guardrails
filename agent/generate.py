@@ -86,6 +86,45 @@ class ScriptedGenerator(Generator):
         return CANNOT_ANSWER
 
 
+class SequenceGenerator(Generator):
+    """Replays a list of answers per question, one per call. Written for day 6.
+
+    `ScriptedGenerator` cannot exercise a retry loop and that is not a small point. It is
+    keyed by question, so the second call returns whatever the first call returned. A loop
+    tested only with it sends a correction and gets the identical query back. The same
+    layer then refuses it for the same reason. Every assertion still passes and the
+    correction was never read by anything.
+
+    So the fixture had to be able to answer differently on the second call before the
+    loop could be tested at all. It still reads no correction. Nothing here is a model
+    and nothing here reacts to what it was told. What this buys is that the loop, the
+    trace and the stopping rules are exercised on real refusals from real layers. What it
+    does not buy is any evidence that a correction helps, and no number in this repo
+    claims otherwise.
+
+    Running past the end returns the last answer forever rather than raising. That is
+    what makes the repeat rule testable, since a generator that runs out is exactly a
+    generator that has stopped responding to correction.
+    """
+
+    name = "sequence"
+
+    def __init__(self, by_question):
+        self.by_question = {q: list(v) for q, v in by_question.items()}
+        self.calls = {}
+
+    def generate(self, prompt_text):
+        question = question_of(prompt_text)
+        if question not in self.by_question:
+            raise GeneratorError("no scripted sequence for %r" % question)
+        answers = self.by_question[question]
+        if not answers:
+            raise GeneratorError("empty sequence for %r" % question)
+        i = self.calls.get(question, 0)
+        self.calls[question] = i + 1
+        return answers[min(i, len(answers) - 1)]
+
+
 class RefusingGenerator(Generator):
     """Says it cannot answer, always.
 

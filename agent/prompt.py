@@ -49,10 +49,25 @@ class Prompt:
     rules: str
     schema: str
     question: str
+    correction: str = ""
+
+    @property
+    def sections(self):
+        """In order. An empty correction is dropped rather than sent as a blank block.
+
+        The correction sits before the question and not after it. `generate.question_of`
+        takes the question to be the last section, so a correction appended at the end
+        would be read back as the question and every retry would go unscripted.
+        """
+        parts = [self.preamble, self.rules, self.schema]
+        if self.correction:
+            parts.append(self.correction)
+        parts.append(self.question)
+        return parts
 
     @property
     def text(self):
-        return "\n\n".join([self.preamble, self.rules, self.schema, self.question])
+        return "\n\n".join(self.sections)
 
     def sizes(self):
         """Characters per section, plus the joins between them.
@@ -64,6 +79,7 @@ class Prompt:
             "preamble": len(self.preamble),
             "rules": len(self.rules),
             "schema": len(self.schema),
+            "correction": len(self.correction),
             "question": len(self.question),
         }
         parts["separators"] = len(self.text) - sum(parts.values())
@@ -88,7 +104,7 @@ def render_schema(tables, chosen=None):
     return "Schema:\n" + catalog.render_all(tables)
 
 
-def build(question, tables, chosen=None, rules=RULES):
+def build(question, tables, chosen=None, rules=RULES, correction=""):
     if not question or not question.strip():
         raise ValueError("refusing to build a prompt with no question")
     return Prompt(
@@ -96,4 +112,5 @@ def build(question, tables, chosen=None, rules=RULES):
         rules=render_rules(rules),
         schema=render_schema(tables, chosen),
         question="Question: " + question.strip(),
+        correction=correction or "",
     )
