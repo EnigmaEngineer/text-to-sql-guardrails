@@ -14,11 +14,13 @@ refusal came from the protection, and the same is true in reverse for a hole.
 
 import argparse
 import os
+import statistics
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agent import role, validate
+from agent import cost, guard, role, validate
 from evals import gold
 from warehouse import catalog
 
@@ -67,6 +69,52 @@ def _ran(con, sql):
     if not rows:
         return "ran, 0 rows"
     return "ran, %d rows, first cell %s" % (len(rows), repr(rows[0][0])[:40])
+
+
+def _timed(fn, repeats=7):
+    """Median of `repeats` passes after one discarded pass.
+
+    The discard is not decoration. A single pass charges the whole process warmup to
+    whichever arm runs first, which on 08-12 made a retry budget read 1.20x when it is
+    really about 1.46x. Two arms compared in a fixed order is the tell.
+    """
+    fn()
+    seen = []
+    for _ in range(repeats):
+        start = time.perf_counter()
+        fn()
+        seen.append((time.perf_counter() - start) * 1000.0)
+    return statistics.median(seen)
+
+
+def approve_cost(con, tables, gold_rows):
+    """What approval costs against what running the query costs.
+
+    This lived in the README as hand arithmetic from 08-10 and went stale the next day,
+    because day 5 put `EXPLAIN` inside `guard.approve` and doubled it. The figure was
+    still true of the call it described and no longer true of the call the pipeline
+    makes. Nothing produced it, so nothing could catch it. It is measured here instead.
+    """
+    queries = [row["gold_sql"] for row in gold_rows]
+    ceiling = cost.warehouse_ceiling(con)
+
+    without = _timed(lambda: [guard.approve(con, tables, q, None) for q in queries])
+    with_cost = _timed(lambda: [guard.approve(con, tables, q, ceiling) for q in queries])
+    execute = _timed(lambda: [con.execute(q).fetchall() for q in queries])
+
+    print("APPROVAL COST over the %d answerable questions, median of 7 after a warmup"
+          % len(queries))
+    print("  %-34s %8.2f ms   %5.1f %% of execute" % (
+        "gate and validate only", without, 100.0 * without / execute))
+    print("  %-34s %8.2f ms   %5.1f %% of execute" % (
+        "with the day 5 cost layer", with_cost, 100.0 * with_cost / execute))
+    print("  %-34s %8.2f ms" % ("running the same queries", execute))
+    print()
+    print("  The cost layer adds %.2f ms, which is %.1fx the rest of approval put"
+          % (with_cost - without, with_cost / without))
+    print("  together. EXPLAIN binds the query, so it is not free. The pipeline always")
+    print("  passes a ceiling, so the second row is the one that describes real use.")
+    print("  Absolute numbers move with the machine. The ratio is the durable part.")
 
 
 def main(db_path, json_path=None):
@@ -142,6 +190,9 @@ def main(db_path, json_path=None):
     print("  unbounded_scan and the cross join rule is what stops it. q028 is the same")
     print("  category with no cross join in it and nothing here touches it. Counting q029")
     print("  as cost coverage would be claiming a day 5 result on day 4.")
+
+    print()
+    approve_cost(con, tables, rows)
 
     if json_path:
         import json as json_mod

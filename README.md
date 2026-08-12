@@ -4,10 +4,10 @@ Ask a question in English, get SQL, and have the agent refuse the query before i
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 5 of 7. The agent runs end to end against a scripted generator, because no model is
-reachable from the environment this is built in. Day 5 adds a cost estimate from `EXPLAIN`
-and a ceiling, plus the measurement showing that the ceiling does not catch the question it
-was aimed at.
+Day 6 of 7. The agent runs end to end against a scripted generator, because no model is
+reachable from the environment this is built in. Day 6 adds a self correction loop and the
+measurement showing that its policy covers fourteen refusal codes and has met three of
+them.
 
 ```
 python3 scripts/build_warehouse.py  --db /tmp/wh.duckdb
@@ -351,11 +351,20 @@ the warehouse is refused, `SELECT 42` included.
 | `no_relation` | the query reads nothing in the warehouse |
 | `unparseable` | it will not parse, reported rather than raised |
 
-**Cost.** `guard.approve` over the 22 gold queries is 12.56 ms, which is 0.571 ms per
-query and 51.2 percent of the 24.54 ms it takes to run the same 22. That ratio is a
-statement about a warehouse where the average query finishes in about a millisecond. On
-anything with real data in it the approval cost stops mattering. Timings taken 2026-08-10
-on the sandbox and only the ratio survives a different machine.
+**Cost.** `guard.approve` over the 22 gold queries is 12.89 ms, which is 49.3 percent of
+the 26.17 ms it takes to run the same 22. That is the day 4 shape, gate and validate with
+no ceiling passed.
+
+The number above described this layer correctly on 08-10 and stopped describing real use
+on 08-11, when day 5 put `EXPLAIN` inside the same function. The pipeline always passes a
+ceiling, and with the cost layer in, approval is 25.43 ms and 97.2 percent of execute.
+Approving a query now costs about what running it costs. The original sentence here
+concluded that approval cost stops mattering, and that conclusion did not survive the
+layer that was added the next day.
+
+Nothing produced the old figure, so nothing could catch it going stale. It is now printed
+by `scripts/validation_report.py` on every run, both shapes side by side. Absolute numbers
+move with the machine by up to 1.8x. The ratio is the part that travels.
 
 **Refusal coverage on the frozen eval set is 4 of 8, up from 3.** `q030` asks for a churn
 score the warehouse does not hold and is now refused as `unknown_column`. `q029` is also
