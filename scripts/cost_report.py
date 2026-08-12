@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -180,6 +181,21 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=os.path.join("warehouse", "retail.duckdb"))
     ap.add_argument("--json", default=None)
-    ap.add_argument("--scratch", default="/tmp/p10-profile.json")
+    # Not a fixed path. The profiler writes this file on every query, and a fixed name in
+    # a shared temp directory belongs to whoever ran the script first. When that is
+    # another user the write fails inside DuckDB and surfaces as
+    # "INTERNAL Error: Attempted to dereference unique_ptr that is NULL", which says
+    # nothing about a path and sends you looking at the query. Same shape as the fixed
+    # path that poisoned the day 4 mutation run.
+    ap.add_argument("--scratch", default=None,
+                    help="where the profiler writes. A private temp file by default.")
     a = ap.parse_args()
-    sys.exit(main(a.db, a.json, a.scratch))
+    scratch = a.scratch
+    if scratch is None:
+        handle, scratch = tempfile.mkstemp(prefix="p10-profile-", suffix=".json")
+        os.close(handle)
+    try:
+        sys.exit(main(a.db, a.json, scratch))
+    finally:
+        if a.scratch is None and os.path.exists(scratch):
+            os.unlink(scratch)
