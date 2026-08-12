@@ -123,11 +123,13 @@ def check_a_generator_error_does_not_escape(ctx):
     eq(a.steps[-1]["step"], "generate", "failed at generate")
 
 
-def check_there_is_no_retry_yet(ctx):
-    """Day 6 owns the self correction loop. Pinned so nobody thinks it already exists.
+def check_answer_is_one_attempt_and_never_loops(ctx):
+    """`solve` owns the loop. `answer` stayed a single attempt and that is the boundary.
 
-    An empty loop written today would make the trace look complete and would make day 6
-    a rename rather than a build.
+    Day 6 could have grown a retry inside this function. Keeping the loop outside means
+    every caller that wants one attempt still gets exactly one, and the retry policy
+    lives in one place rather than behind a default argument. `tests/test_trace.py`
+    covers the loop.
     """
     a = run_with(ctx, "delete things", "DELETE FROM retail.dim_customer")
     eq(len([s for s in a.steps if s["step"] == "generate"]), 1, "generated exactly once")
