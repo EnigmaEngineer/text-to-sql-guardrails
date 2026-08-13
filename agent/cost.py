@@ -73,7 +73,24 @@ class NothingToEstimate(Exception):
 # is that an unfamiliar operator gets refused even when it was harmless, which is the
 # direction a guardrail should fail in, and it surfaces as a refusal someone can read
 # rather than as silence.
+#
+# Two more were added on 2026-08-13 and they did NOT come off the answer key, which is
+# worth stating because the paragraph above says the list is derived from it. `LIMIT` and
+# `STREAMING_LIMIT` carry no estimate, and every gold query that limits also orders, which
+# plans as `TOP_N`. So no gold query produces either name and the answer key check stayed
+# green while `SELECT customer_id FROM retail.dim_customer LIMIT 5` was refused. A limit
+# is the clearest non multiplying operator there is. Its output is bounded by its input
+# and by the limit value at once, and the scan underneath it is still counted.
 UNESTIMATED_AND_SAFE = frozenset(
+    {
+        "ORDER_BY", "UNGROUPED_AGGREGATE", "PERFECT_HASH_GROUP_BY", "TOP_N",
+        "LIMIT", "STREAMING_LIMIT",
+    }
+)
+
+# The four that really are derived from the answer key, kept separate so the claim in the
+# comment above stays checkable and so a test can tell the two sources apart.
+FROM_THE_ANSWER_KEY = frozenset(
     {"ORDER_BY", "UNGROUPED_AGGREGATE", "PERFECT_HASH_GROUP_BY", "TOP_N"}
 )
 

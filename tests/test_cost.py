@@ -297,3 +297,32 @@ def check_the_gate_still_runs_before_the_estimate(ctx):
     eq(verdict.reason, "multiple_statements", "reason")
     true(verdict.judgement is None, "cost never ran")
     true(not hasattr(role, "explain"), "and role has no plan path of its own")
+
+
+def check_a_limit_without_an_order_by_is_not_refused(ctx):
+    """Found on day 7. `LIMIT` and `STREAMING_LIMIT` carry no estimate.
+
+    Every gold query that limits also orders, which plans as `TOP_N`, so neither name
+    appears in the answer key and the answer key check stayed green while ordinary SQL
+    was refused. Both shapes below were refused as `unscored_operator` until today.
+    """
+    from warehouse import catalog
+    tables = catalog.read(ctx.con)
+    ceiling = cost.warehouse_ceiling(ctx.con)
+    for sql in (
+        "SELECT customer_id FROM retail.dim_customer LIMIT 5",
+        "SELECT customer_id FROM retail.dim_customer WHERE loyalty_tier = 'gold' LIMIT 10",
+    ):
+        v = guard.approve(ctx.con, tables, sql, ceiling)
+        true(v.allowed, "%s -> %s %s" % (sql, v.reason, v.detail))
+
+
+def check_the_two_limit_operators_are_not_claimed_to_come_from_the_answer_key(ctx):
+    """The comment says the list is derived from the answer key. Two entries are not.
+
+    Keeping the derived four in their own frozenset means the claim stays checkable
+    instead of quietly becoming false as entries are added.
+    """
+    added = cost.UNESTIMATED_AND_SAFE - cost.FROM_THE_ANSWER_KEY
+    eq(sorted(added), ["LIMIT", "STREAMING_LIMIT"], "entries not from the answer key")
+    true(cost.FROM_THE_ANSWER_KEY < cost.UNESTIMATED_AND_SAFE, "derived four are a subset")

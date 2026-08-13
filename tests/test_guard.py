@@ -130,3 +130,22 @@ def check_validate_is_not_importable_as_an_execution_path():
     """`validate` reports. It must never be the thing that runs the query."""
     true(not hasattr(validate, "execute"), "validate has no execute")
     true(not hasattr(validate, "run"), "validate has no run")
+
+
+def check_execute_does_not_raise_when_approve_does(ctx):
+    """`approve` can raise and `execute` is the one documented never to.
+
+    A qualifier no relation defines, inside a statement that has a CTE, is skipped by
+    validation because resolving it needs name resolution. `EXPLAIN` then binds it and
+    raises. Found by the day 7 audit while probing the join rule change.
+    """
+    sql = (
+        "WITH c AS (SELECT 1 AS x) SELECT h.order_id FROM retail.fct_order_header h "
+        "JOIN retail.dim_date d ON h.order_date_key = zz.date_key"
+    )
+    from agent import cost
+    ceiling = cost.warehouse_ceiling(ctx.con)
+    result = guard.execute(ctx.con, _tables(ctx), sql, ceiling)
+    eq(result.ran, False, "it did not run")
+    eq(result.verdict.allowed, False, "and it was refused rather than raised")
+    true("zz" in result.error, "the engine's own message survives: %r" % result.error)
