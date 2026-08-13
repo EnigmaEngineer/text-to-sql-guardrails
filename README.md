@@ -1,11 +1,10 @@
 # text-to-sql-guardrails
 
-Ask a question in English, get SQL, and have the agent refuse the query before it runs if
+Ask a question in English, get SQL and have the agent refuse the query before it runs if
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 6 of 7. The agent runs end to end against a scripted generator, because no model is
-reachable from the environment this is built in. Day 6 adds a self correction loop and the
+Day 6 of 7. Day 6 adds a self correction loop and the
 measurement showing that its policy covers fourteen refusal codes and has met three of
 them.
 
@@ -20,7 +19,7 @@ python3 scripts/cost_report.py      --db /tmp/wh.duckdb --json /tmp/c.json
 
 `requirements.txt` is duckdb and matplotlib. The embedding scorer needs
 `requirements-dense.txt` on top, which is roughly 500 MB of wheels and a 130 MB model
-download. Everything except that scorer runs without them, and the report prints a line
+download. Everything except that scorer runs without them and the report prints a line
 saying it ran without them rather than quietly showing a shorter table.
 
 The database goes outside the repo when this runs in a sandbox. A DuckDB checkpoint
