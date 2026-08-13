@@ -91,16 +91,43 @@ def plan_of(con, sql, dialect=None):
     return json.loads(con.execute(statement).fetchall()[0][1])
 
 
-def approve(con, tables, sql, ceiling=None):
+GATE = "gate"
+VALIDATE = "validate"
+COST = "cost"
+LAYERS = (GATE, VALIDATE, COST)
+
+
+def approve(con, tables, sql, ceiling=None, layers=LAYERS):
     """Run every layer and say which one refused, without running the query itself.
 
     `ceiling` of None means no cost check, which is what the reports that measure the
     earlier layers on their own want. It is not the default anywhere real. `pipeline`
     reads one off the warehouse and passes it.
+
+    `layers` exists for exactly one caller, `evals.scorecard.ablate`, which measures what
+    each layer contributes by taking it away. It is not a feature and it is not a way to
+    turn the guard down. An empty set raises rather than approving, because a door with
+    no locks on it is a bug here and never a configuration. `tests/test_guard.py` fails
+    if anything in `agent/` ever passes this argument.
     """
-    decision = role.inspect(con, sql)
-    if not decision.allowed:
-        return Verdict(False, "gate", decision.reason, decision.detail, decision, None)
+    layers = tuple(layers)
+    unknown = [name for name in layers if name not in LAYERS]
+    if unknown:
+        raise ValueError("unknown layer(s): %s" % ", ".join(sorted(unknown)))
+    if not layers:
+        raise ValueError(
+            "approve with no layers is a bug, not an open door. Call the connection "
+            "directly if that is really what you meant."
+        )
+
+    decision = None
+    if GATE in layers:
+        decision = role.inspect(con, sql)
+        if not decision.allowed:
+            return Verdict(False, "gate", decision.reason, decision.detail, decision, None)
+
+    if VALIDATE not in layers:
+        return _after_validation(con, sql, ceiling, layers, decision, None)
 
     report = validate.check(con, tables, sql)
     if not report.ok:
@@ -114,7 +141,17 @@ def approve(con, tables, sql, ceiling=None):
             report,
         )
 
-    if ceiling is None:
+    return _after_validation(con, sql, ceiling, layers, decision, report)
+
+
+def _after_validation(con, sql, ceiling, layers, decision, report):
+    """The cost layer and the approval, shared by both routes into it.
+
+    This is a helper rather than a second door. It runs no query the caller did not
+    already reach through `approve`, and `plan_of` is still the only `.execute()` of
+    model text in this module.
+    """
+    if ceiling is None or COST not in layers:
         return Verdict(True, "approved", "single_read_on_known_objects", "", decision, report)
 
     try:
@@ -124,6 +161,13 @@ def approve(con, tables, sql, ceiling=None):
         # should be unreachable, because validation refuses a query that reads no table
         # in the warehouse, so if this ever fires the interesting part is which of the
         # two layers was wrong.
+        #
+        # A plan the engine refuses to PRODUCE is a different case and it is deliberately
+        # not caught here. `EXPLAIN` binds, so it raises on a write and on a query naming
+        # a relation that does not exist, and both of those are refused by a layer above
+        # before this line runs. The day 7 ablation depends on that exception escaping.
+        # Swallowing it would make a cost-only arm look like it refuses a DELETE, which
+        # it does not. What it does is fail to plan one. See `docs/adr-0011`.
         return Verdict(
             False, "cost", "no_estimate", str(exc), decision, report,
             cost.Judgement(False, "no_estimate", str(exc), None, ceiling),
@@ -164,7 +208,24 @@ def execute(con, tables, sql, ceiling=None):
     Approval is already about half the cost of running these queries, measured over the
     answer key, so paying it twice for a trace line was not a rounding error.
     """
-    verdict = approve(con, tables, sql, ceiling)
+    try:
+        verdict = approve(con, tables, sql, ceiling)
+    except Exception as exc:                                # noqa: BLE001
+        # `approve` can raise, and the day 7 audit found a query that does it. `EXPLAIN`
+        # binds, so a qualifier that no relation defines raises a `BinderException` out
+        # of the cost layer. Validation catches that when the statement has no CTE and no
+        # subquery, and it cannot when there is one, because resolving a name through a
+        # derived table is the binder's job.
+        #
+        # The catch is here rather than inside `approve` on purpose. This function is the
+        # one documented never to raise. `approve` is also what the day 7 ablation calls,
+        # and an ablation that never saw an exception would report a cost-only guard as
+        # refusing a `DELETE` when what it really does is fail to plan one.
+        return Result(
+            Verdict(False, "cost", "no_estimate", str(exc).splitlines()[0]),
+            None,
+            str(exc).splitlines()[0],
+        )
     if not verdict.allowed:
         return Result(verdict)
     try:
