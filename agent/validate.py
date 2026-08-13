@@ -187,6 +187,22 @@ def _columns(shape, by_name, known_columns, findings):
             qualifier, column = parts[-2], parts[-1]
             table = by_name.get(qualifier)
             if table is None:
+                if bare_ok:
+                    # No CTE and no subquery, so there is nothing in this statement that
+                    # could bind `zz` in `zz.date_key`. Skipping it was safe while the
+                    # join rule counted real tables, because a condition naming an
+                    # unknown qualifier came out under two and was refused there. Day 7
+                    # made the join rule count qualifiers, which is right, and that made
+                    # this skip reachable from a query the guard then approved and the
+                    # cost layer crashed on. Reported as `unknown_table` rather than as a
+                    # new code, because that is what it is and a new code would need a
+                    # correction strategy for a case no eval question reaches.
+                    findings.append(
+                        Finding(
+                            "unknown_table",
+                            "%s is not a relation this query defines" % qualifier,
+                        )
+                    )
                 skipped += 1
                 continue
             checked += 1
@@ -216,17 +232,36 @@ def _columns(shape, by_name, known_columns, findings):
     return checked, skipped
 
 
-def _join_tables(node, by_name):
-    """Which real tables a join condition mentions."""
+def _join_sides(node, by_name):
+    """Which relation names a join condition mentions, counting aliases separately.
+
+    This counted distinct real **tables** until day 7 and that refused every self join.
+    `fct_order_header a JOIN fct_order_header b ON a.customer_id = b.customer_id AND
+    a.order_id < b.order_id` is a repeat purchase question. Both aliases resolve to one
+    table, so the old set had size one and the rule fired. No gold query self joins, so
+    the answer key check stayed green while it shipped, which is the third time a rule
+    here looked correct until it met a shape the answer key does not contain.
+
+    Counting the qualifier is the right unit, because what the rule is actually asking is
+    whether the condition relates the two sides of the join, and the sides are relations
+    rather than tables.
+
+    The first version of this fix kept a filter on `by_name`, so a qualifier belonging to
+    a CTE or a derived table did not count as a side. A mutation pass removed the filter,
+    survived, and the reason it survived is that the filter was a second false refusal of
+    exactly the ot-035 kind. `... FROM dim_customer c JOIN big b ON b.customer_id =
+    c.customer_id` with `big` a CTE was refused, and it is ordinary SQL that runs and
+    returns rows. No gold query joins a CTE, so the answer key check stayed green through
+    that too. Every qualifier counts now. A qualifier naming nothing real is somebody
+    else's finding, `unknown_column` or the binder, and it is not this rule's business.
+
+    `by_name` is still taken as an argument because the caller has it and a later version
+    of this rule will want it. It is deliberately unused here rather than dropped, so the
+    signature does not churn.
+    """
     sub = _Shape()
     _walk(node.get("condition"), sub)
-    seen = set()
-    for parts in sub.column_refs:
-        if len(parts) >= 2:
-            table = by_name.get(parts[-2])
-            if table:
-                seen.add(table)
-    return seen
+    return {parts[-2] for parts in sub.column_refs if len(parts) >= 2}
 
 
 def _joins(shape, by_name, findings):
@@ -256,13 +291,13 @@ def _joins(shape, by_name, findings):
         # are CROSS and NATURAL, both handled above. If some future ref_type arrives with
         # no condition, `_join_tables` returns an empty set and the rule below refuses it
         # anyway, so removing the branch costs no safety.
-        related = _join_tables(node, by_name)
+        related = _join_sides(node, by_name)
         if len(related) < 2:
             findings.append(
                 Finding(
                     "unrelated_join",
-                    "join condition touches %d table(s), so the join does not relate its sides"
-                    % len(related),
+                    "join condition touches %d relation(s), so the join does not relate "
+                    "its sides" % len(related),
                 )
             )
 

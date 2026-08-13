@@ -234,3 +234,83 @@ def check_report_serialises_for_the_trace(ctx):
         "keys",
     )
     eq(payload["findings"][0]["code"], "no_relation", "finding code survives")
+
+
+# --- ot-035, closed on day 7 --------------------------------------------------------
+#
+# `unrelated_join` counted distinct real tables until today, so a self join resolved both
+# aliases to one table and every self join was refused. No gold query self joins, so the
+# answer key check stayed green while it shipped. Both shapes below fail against the
+# unfixed rule, checked by reverting it in a scratch copy before these were committed.
+
+
+def check_a_self_join_with_the_ordering_in_the_on_clause_is_allowed(ctx):
+    """The repeat purchase question. Two aliases of one table, related to each other."""
+    sql = (
+        "SELECT a.order_id, b.order_id FROM retail.fct_order_header a "
+        "JOIN retail.fct_order_header b ON a.customer_id = b.customer_id "
+        "AND a.order_id < b.order_id"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    eq(r.ok, True, "findings %s" % (r.codes(),))
+
+
+def check_a_self_join_with_the_ordering_in_a_where_clause_is_allowed(ctx):
+    """Same query, written the other way. The condition is thinner and still relates."""
+    sql = (
+        "SELECT a.order_id, b.order_id FROM retail.fct_order_header a "
+        "JOIN retail.fct_order_header b ON a.customer_id = b.customer_id "
+        "WHERE a.order_id < b.order_id"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    eq(r.ok, True, "findings %s" % (r.codes(),))
+
+
+def check_a_join_condition_touching_one_side_is_still_refused(ctx):
+    """The rule still has to do its job. Counting aliases must not widen it to nothing."""
+    sql = (
+        "SELECT h.order_id FROM retail.fct_order_header h "
+        "JOIN retail.dim_date d ON h.order_date_key = 5"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    true("unrelated_join" in r.codes(), "codes %s" % (r.codes(),))
+
+
+def check_a_constant_join_condition_is_still_refused(ctx):
+    """`ON 1 = 1` names no relation at all and is a cross join wearing an ON clause."""
+    sql = (
+        "SELECT h.order_id FROM retail.fct_order_header h "
+        "JOIN retail.dim_date d ON 1 = 1"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    true("unrelated_join" in r.codes(), "codes %s" % (r.codes(),))
+
+
+def check_a_join_to_a_cte_is_allowed(ctx):
+    """Found by a surviving mutant on day 7, not by anyone reading the rule.
+
+    The first ot-035 fix still filtered join qualifiers through the catalog, so a CTE
+    alias did not count as a side and every join to a CTE was refused. This query runs
+    and returns rows.
+    """
+    sql = (
+        "WITH big AS (SELECT customer_id, count(*) AS n FROM retail.fct_order_header "
+        "GROUP BY customer_id) "
+        "SELECT c.full_name, b.n FROM retail.dim_customer c "
+        "JOIN big b ON b.customer_id = c.customer_id ORDER BY b.n DESC LIMIT 5"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    eq(r.ok, True, "findings %s" % (r.codes(),))
+    eq(len(ctx.con.execute(sql).fetchall()), 5, "and the query really runs")
+
+
+def check_a_join_to_a_derived_table_is_allowed(ctx):
+    """Same defect, reached through a subquery in the FROM clause instead of a CTE."""
+    sql = (
+        "SELECT c.full_name, b.n FROM retail.dim_customer c "
+        "JOIN (SELECT customer_id, count(*) AS n FROM retail.fct_order_header "
+        "GROUP BY customer_id) b ON b.customer_id = c.customer_id LIMIT 3"
+    )
+    r = validate.check(ctx.con, _tables(ctx), sql)
+    eq(r.ok, True, "findings %s" % (r.codes(),))
+    eq(len(ctx.con.execute(sql).fetchall()), 3, "and the query really runs")
