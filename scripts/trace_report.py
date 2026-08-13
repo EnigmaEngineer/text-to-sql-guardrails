@@ -28,7 +28,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent import correct, cost, generate, guard, pipeline, trace as trace_mod  # noqa: E402
-from evals import reach  # noqa: E402
+from evals import reach, scorecard  # noqa: E402
 from tests.test_correct import refusal_codes  # noqa: E402
 from warehouse import catalog  # noqa: E402
 
@@ -132,12 +132,18 @@ def reach_section(con, tables, rows, ceiling):
     print("  unreached %d  %s" % (len(unreached), ", ".join(unreached)))
 
     refused = measured.refused_by_something
+    # Day 6 printed the matching reading as `refused - 1`. That was true on the day and
+    # it was arithmetic rather than a definition, which is `ot-037`. Day 7 computes it
+    # from `scorecard.OWNER`, so the two readings can disagree by any amount.
+    card = scorecard.score(con, tables, rows, ceiling, guard.approve, "trace_report")
+    matching = card.refused("matching")
     print()
     print("  REFUSAL COVERAGE, both readings, because the repo has been quoting one")
     print("    refused by something                      %d of %d" % (refused, n))
-    print("    refused by the layer its label points at  %d of %d" % (refused - 1, n))
-    print("    the difference is q029. It is labelled unbounded_scan and the day 4")
-    print("    cross join rule is what stops it, so the two readings disagree by one.")
+    print("    refused by the layer its label points at  %d of %d" % (matching, n))
+    for o in card.mislabelled():
+        print("    %s is labelled %s and %s is what stops it" % (
+            o.qid, o.refuse_reason, o.stage))
     print("    still runs: %s" % (", ".join(measured.approved) or "none"))
     if measured.suspect:
         print()

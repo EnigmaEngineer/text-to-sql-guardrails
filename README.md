@@ -4,17 +4,24 @@ Ask a question in English, get SQL and have the agent refuse the query before it
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 6 of 7. Day 6 adds a self correction loop and the
-measurement showing that its policy covers fourteen refusal codes and has met three of
-them.
+Day 7 of 7, complete. The agent runs end to end against a scripted generator, because no
+model is reachable from the environment this is built in.
+
+**There is no accuracy number in this repo and there cannot be one.** Accuracy on a text
+to SQL set is a property of the thing writing the SQL, and nothing here has ever called a
+model. So day 7 scores the guard instead. Scored on all 30 frozen questions the guard gets
+27, and a system with no guardrails at all gets 22. That gap is what six days of work
+bought. `docs/adr-0011` is the whole argument.
 
 ```
-python3 scripts/build_warehouse.py  --db /tmp/wh.duckdb
-python3 scripts/check_gold.py       --db /tmp/wh.duckdb
-python3 -m tests.run_all            --db /tmp/wh.duckdb
-python3 scripts/retrieval_report.py --db /tmp/wh.duckdb --json /tmp/r.json
+python3 scripts/build_warehouse.py   --db /tmp/wh.duckdb
+python3 scripts/check_gold.py        --db /tmp/wh.duckdb
+python3 -m tests.run_all             --db /tmp/wh.duckdb
+python3 scripts/retrieval_report.py  --db /tmp/wh.duckdb --json /tmp/r.json
 python3 scripts/validation_report.py --db /tmp/wh.duckdb --json /tmp/v.json
-python3 scripts/cost_report.py      --db /tmp/wh.duckdb --json /tmp/c.json
+python3 scripts/cost_report.py       --db /tmp/wh.duckdb --json /tmp/c.json
+python3 scripts/trace_report.py      --db /tmp/wh.duckdb
+python3 scripts/scorecard_report.py  --db /tmp/wh.duckdb --json /tmp/s.json
 ```
 
 `requirements.txt` is duckdb and matplotlib. The embedding scorer needs
@@ -54,11 +61,13 @@ agent/guard.py           gate then validate then cost, the only door to the conn
 agent/correct.py         one retry strategy per refusal code, derived from the source
 agent/trace.py           every attempt and every correction, and a text renderer
 evals/reach.py           which refusal codes anything but a test actually produces
+evals/scorecard.py       all 30 questions, the two degenerate arms, and the ablation
 scripts/role_probe.py    what a read-only connection actually blocks
 scripts/validation_report.py  what each layer catches, and what ran without it
 scripts/cost_report.py   the answer key, the two candidate metrics, and the probes
 scripts/trace_report.py  the policy, what a retry costs, and what reaches it
-docs/adr-00*.md          ten decisions, with what each one costs
+scripts/scorecard_report.py  every question, the floor, and what each layer is worth
+docs/adr-00*.md          eleven decisions, with what each one costs
 ```
 
 ## Measured on 2026-08-07
@@ -371,6 +380,11 @@ refused, by the cross join rule, and it is labelled `unbounded_scan`. Counting t
 cost coverage would be claiming a day 5 result on day 4. `q028` is the same category with
 no cross join in it and nothing built so far touches it.
 
+> Read this as the matching reading. Day 6 found that the repo had been quoting one of two
+> numbers without saying which. Five of the eight are refused by something and four are
+> refused by the layer their label points at. Day 7 computes both from `scorecard.OWNER`
+> rather than by subtracting one. See the day 7 section.
+
 **One door.** `agent/guard.py` composes gate then validation and is the only path from
 generated SQL to the connection. `role.run` was deleted rather than left as a second door.
 `tests/structural.py` walks `agent/` with `ast` and fails if any `.execute()` outside
@@ -502,7 +516,9 @@ answer and that is the number the plan will not give. Refusal coverage stays at 
 | unbounded_scan | 0 of 2 by cost, 1 of 2 counting the day 4 cross join rule |
 | pii_export | 0 of 2, still nothing |
 
-`docs/adr-0009` records the decision and both of the wrong turns below.
+`docs/adr-0009` records the decision and both of the wrong turns below. Day 7 took the
+layer out entirely and scored the set again. The pooled figure does not move by a single
+question, which is what this paragraph said in words and could not say as a number.
 
 ## What day 5 got wrong
 
@@ -552,6 +568,10 @@ JOIN retail.fct_order_header b ON a.customer_id = b.customer_id AND a.order_id <
 
 That is a repeat purchase question and it is legitimate. No gold query self joins, which is
 why day 4 shipped without seeing it. Same shape as everything above.
+
+> Fixed on day 7. The rule counts qualifiers rather than tables now. A second false
+> refusal of the same kind was found in the fix itself by a surviving mutant. See the day
+> 7 section.
 
 ## Mutation, day 5
 
@@ -614,9 +634,9 @@ than telling the model anything it could not already have worked out.
 nothing reaches is an untested decision and it should not be able to hide inside a table
 of fourteen.
 
-**A full retry budget costs about 1.5x a clean run, not 3x.** From
-`scripts/trace_report.py`, median of seven repeats after a discarded warmup, on the 22
-answerable questions. 70.3 ms against 102.6 ms, spread 66.4 to 73.5 and 98.9 to 106.4, a
+**A full retry budget costs about 1.5x a clean run rather than 3x.** From
+`scripts/trace_report.py` over the 22 answerable questions. Median of seven repeats after
+a discarded warmup. 70.3 ms against 102.6 ms, spread 66.4 to 73.5 and 98.9 to 106.4, a
 ratio of 1.46. A refused attempt is judged and never executed, which is where the missing
 1.5x went. The ratio read 1.46, 1.49 and 1.51 across three passes today and the
 milliseconds moved more than that, because the sandbox varies by roughly 1.8x between
@@ -695,6 +715,153 @@ the answer key through the guard. It fires only when a guardrail starts refusing
 queries. The other is the second entry in `NAME_ERROR_CODES`, which nothing currently
 trips. After the six fixes both rounds kill everything.
 
+## Day 7, measured on 2026-08-13
+
+The plan for today says "README with accuracy numbers on the eval set". There is no model
+here, so there is no accuracy number, and `scripts/scorecard_report.py` opens by saying so
+rather than leaving a gap that gets filled in later by someone in a hurry. What it prints
+instead is the guard scored against all 30 frozen questions.
+
+```
+python3 scripts/scorecard_report.py --db /tmp/wh.duckdb --json /tmp/s.json
+python3 scripts/scorecard_chart.py  --db /tmp/wh.duckdb --out docs/day7_scorecard.png
+python3 -m tests.run_all            17 modules, 243 checks, 243 passed
+```
+
+**The pooled number, and how much of it is free.**
+
+| arm | pooled, any refusal counts | out of 30 |
+|---|---|---|
+| refuse everything | 8 | 26.7 % |
+| approve everything | 22 | 73.3 % |
+| this repo | 27 | 90.0 % |
+
+A system with no guardrails at all scores 73.3 percent, because the set holds 22 correct
+queries against 8 that should be stopped and approving everything gets all 22. That floor
+is measured rather than argued. It is `scorecard.open_guard` and it is one of the arms
+above. Six days of guardrails moved the number by 5 questions.
+
+**The two halves are not the same kind of evidence.** The 22 answerable questions are run
+as their gold SQL, and that half is in sample by construction. Three checks fail the build
+if any layer refuses a gold query, and day 4's first column rule refused six of them and
+was rewritten. So the 22 record a green test rather than a measurement. The 8 refuse
+questions are run as hand written plausible SQL and they are the only part that could have
+gone badly.
+
+| the out of sample half | |
+|---|---|
+| refused by something | 5 of 8 |
+| refused by the layer its label points at | 4 of 8 |
+| exact one sided 95 % lower bound on 5 of 8 | 0.289 |
+
+Eight observations do not support a percentage. The bound is what the count licenses, and
+it is the same Clopper Pearson convention used on the earlier project in this program, so
+the two are comparable. `check_the_lower_bound_reproduces_two_figures_from_an_earlier_project`
+pins it against two values computed independently in July.
+
+**Take a layer away and score it again.** `guard.approve` grew a `layers` argument for
+this and for nothing else. An empty set raises rather than approving, and a check walks
+`agent/` with `ast` and fails if any call site there ever passes it.
+
+| layers | pooled | refused, any | refused, matching | raised |
+|---|---|---|---|---|
+| all three | 27 | 5 of 8 | 4 of 8 | 0 |
+| no cost | 27 | 5 of 8 | 4 of 8 | 0 |
+| no validate | 26 | 4 of 8 | 4 of 8 | 1 |
+| no gate | 27 | 5 of 8 | 1 of 8 | 0 |
+| gate only | 25 | 3 of 8 | 3 of 8 | 0 |
+| validate only | 27 | 5 of 8 | 1 of 8 | 0 |
+| cost only | 23 | 1 of 8 | 1 of 8 | 4 |
+
+**Removing the cost layer changes nothing.** A whole day of work and the frozen set cannot
+see it. Day 5 said that in words. This is the number, and
+`check_taking_the_cost_layer_away_changes_nothing_on_this_set` fails the suite if it ever
+stops being true, which would mean this paragraph needs rewriting.
+
+**Removing the parser gate also changes nothing, under the reading this repo quoted for
+five days.** Static validation refuses a `DELETE` on its own, because `json_serialize_sql`
+only serializes reads and everything else comes back as `unparseable`. Same score, wrong
+reason. The gate's entire contribution is the reason, and the reason only shows up in the
+matching reading. That is 4 of 8 with the gate and 1 of 8 without it. A repo quoting a
+single number would have concluded the gate was redundant.
+
+**The cost layer alone raises on four questions rather than refusing them.** `EXPLAIN` on
+a `DELETE` over a read-only connection is an `InvalidInputException` and `EXPLAIN` on an
+unknown column is a `BinderException`, and neither is caught. Day 5 put cost last because
+`EXPLAIN` binds and binding a table function opens what it points at. This is the cruder
+second reason. Run first it does not refuse, it explodes. A raised exception is counted
+wrong on both halves throughout, because an ablation that scored a crash as coverage would
+report the layer it just removed as unnecessary.
+
+![the scorecard and the layer ablation](docs/day7_scorecard.png)
+
+## What day 7 got wrong
+
+**Day 6 printed the matching reading as `refused_by_something - 1`.** It was correct on
+the day and it was arithmetic rather than a definition. `scorecard.OWNER` is the
+definition now, and `check_the_matching_reading_is_not_refused_minus_one` uses a fixture
+where the gap is two, so anything subtracting one fails. This is the `ot-037` class from
+the day before, which is a published figure with nothing producing it.
+
+**The `layers` argument is a way to turn the guard down.** Adding one on the last day, to
+a module whose whole point is being the only door, is the kind of change that looks
+harmless in a diff. It is closed as far as it can be closed. An empty set raises, an
+unknown layer name raises, and nothing in `agent/` may pass it. The cost is stated in
+`docs/adr-0011` rather than argued away.
+
+**The check that the cost layer changes nothing passed whether or not the layer ran.** A
+mutant making `layers` ignore its cost entry survived the suite, because the arm with the
+layer and the arm without it score the same either way and that is the finding the check
+was written about. It needed a query the cost layer does refuse, which is the day 5
+inequality join. That is a ninth distinct way something has passed here while being wrong,
+and it is the first where the reason was the result being reported.
+
+**The first fix for the self join defect had the same defect in it.** See below.
+
+## Two false refusals closed on day 7
+
+`unrelated_join` refuses a join whose condition does not relate the two sides. It counted
+distinct real **tables**, so every self join was refused, because both aliases resolve to
+one table. That is `ot-035`, found on day 5 and left alone because the fix is a design
+question rather than a patch. The unit is the qualifier and not the table, since what the
+rule is asking is whether the condition relates two relations.
+
+```sql
+-- refused until today. It runs, and it is an ordinary repeat purchase question.
+SELECT a.order_id, b.order_id
+FROM retail.fct_order_header a
+JOIN retail.fct_order_header b
+  ON a.customer_id = b.customer_id AND a.order_id < b.order_id
+```
+
+**The first version of that fix still filtered the qualifiers through the catalog, and a
+mutation pass found it.** A mutant removing the filter survived, and the reason it
+survived is that the filter was a second false refusal of exactly the same kind. A join to
+a CTE or to a derived table names a qualifier that is not a base table, so it did not
+count as a side and the join was refused.
+
+```sql
+-- also refused until today. It runs and returns five rows.
+WITH big AS (SELECT customer_id, count(*) AS n FROM retail.fct_order_header GROUP BY customer_id)
+SELECT c.full_name, b.n FROM retail.dim_customer c
+JOIN big b ON b.customer_id = c.customer_id ORDER BY b.n DESC LIMIT 5
+```
+
+No gold query self joins and no gold query joins a CTE, so the answer key check stayed
+green through both. That is the third and fourth time a rule here has looked correct until
+it met a shape the answer key does not contain, after the day 4 output alias and the day 5
+bare count. Running a guardrail over the answer key is necessary and it is not sufficient.
+Both fixes were reverted in a scratch copy and the new checks confirmed failing before
+they were committed.
+
+## Mutation, day 7
+
+Twenty two mutants over `evals/scorecard.py`, the `layers` argument in `agent/guard.py`
+and the join rule in `agent/validate.py`. The first round of twenty killed eighteen. Both
+survivors were real gaps rather than unreachable branches, and one of them was a live
+defect in that day's own fix. After the two fixes a second round of twenty two killed
+everything, with the control clean.
+
 ## Known limitations
 
 **No model has ever been called.** There is no API key and no local weights in the
@@ -720,13 +887,6 @@ list and ignores what it is told. So the loop, the trace and the four stopping r
 exercised on real refusals from real layers, and whether a correction actually helps is
 not measured anywhere in this repo. No number here claims it does.
 
-**A self join is still refused and none should be.** The `unrelated_join` rule counts
-distinct real tables in a join condition, and a self join resolves both aliases to one
-table. `fct_order_header a JOIN fct_order_header b ON a.customer_id = b.customer_id AND
-a.order_id < b.order_id` is a repeat purchase question and it is refused. No gold query
-self joins, so the answer key check did not see it. The direction is the safe one, since
-it refuses correct queries rather than approving dangerous ones.
-
 **Bare columns under a CTE or a subquery are skipped, not checked.** Those names can be
 bound inside the query and resolving them properly means implementing name resolution.
 Over the answer key it is 112 column references checked and 8 skipped. The count is
@@ -747,11 +907,6 @@ underestimates walks under the ceiling. This stops accidents.
 SQL is the obvious answer and it is a change to the query rather than a judgement about it,
 which is a different kind of act and belongs behind a decision rather than in a day 5
 commit.
-
-**Every self join is refused by day 4 and none of them should be.** `unrelated_join` counts
-distinct tables in the join condition, and a self join resolves both aliases to one table.
-No gold query self joins, so this shipped unseen. Found on day 5 and left, because the fix
-is a design question about how to tell a self join from a cartesian product.
 
 **The Snowflake path has never run.** `adapter.snowflake()` carries `verified = False` and
 a test asserts it. Every number in this repo comes from DuckDB. `cost.read_plan` is written
@@ -809,13 +964,58 @@ accuracy figure.
 cancellation rate is a constant this repo chose. Nothing measured against this warehouse
 says anything about real retail data.
 
+## What I would do next, and why it is not here
+
+Five things were tracked all week as decisions owed by the last day. Four of them are not
+built. That is the answer rather than a delay, and each one says what it would cost.
+
+**A column level policy, so a PII read is refused.** This is the largest gap and it is
+first. `SELECT customer_email FROM retail.dim_customer` passes every layer, because it is
+one read of a real column of a real table. Two frozen questions ask for exactly that. The
+cheap version is a deny list checked against the parse tree the gate already builds, and it
+is about twenty lines that would take refusal coverage from 5 of 8 to 7 of 8. **That is
+precisely why it is not here.** Closing a measured gap with twenty lines on the final day,
+to move a number the same day that number is published, is the one thing this repo spent
+seven days not doing. The honest version needs a policy model with a subject and a purpose
+attached to a query, and nothing in the plan earned one. `docs/adr-0006` has the argument.
+
+**Foreign keys in the schema, so the join graph reads a fact instead of guessing.**
+`warehouse/schema.sql` declares primary keys and no foreign keys, so
+`retrieval/graph.py` infers edges from column naming. It breaks on `dim_date`, whose key is
+`date_key` while the fact tables carry `order_date_key`. Six scored questions need that
+table and not one contains the word date, so no scorer reaches it either. Adding the
+constraints is a day 1 change and it rebuilds the warehouse, which changes the gold answers
+that every number since day 1 rests on. The freeze hash covers the questions and not the
+schema, so it is permitted and it is still the wrong week to do it. It is the first thing a
+second week does, together with a re-verification of all 22 gold fingerprints.
+
+**A gate interface on the adapter, or a plainer statement that the guardrails do not
+travel.** All three layers are DuckDB shaped. The parser gate and the validator both go
+through `json_serialize_sql`, and the cost layer reads DuckDB's plan document.
+`adapter.snowflake()` carries a case folding rule and an `EXPLAIN` prefix and says nothing
+about gating. Writing an unverified Snowflake gate alongside the verified DuckDB one is the
+worse option, because a safety component that has never run is worse than an absent one. So
+the README states the limit and `adapter.snowflake().verified` is `False` with a test
+asserting it.
+
+**A second, unfrozen probe set, so the correction policy stops being mostly untested.**
+Eleven of the fourteen retry strategies have never met an input from outside the test
+suite. Growing the frozen set is the natural fix and `docs/adr-0003` forbids it, because
+the freeze hash is what makes every earlier number comparable. `evals/reach.PLAUSIBLE` is
+already an unfrozen probe set in miniature and growing it is the shape of the answer. It is
+a day of work and it belongs to whichever project needs those codes to be real.
+
+**The self join defect.** This one was built, on the last day, and it turned out to hide a
+second defect of the same kind. See the day 7 section.
+
 ## Mutation
 
 The test suite is checked by breaking things on purpose. Day 1 ran 12 mutants and killed
 11. Day 2 ran 14 more over the new modules and killed 13. Day 3 ran 14 more and killed 13.
-Day 4 ran 17 and killed 15, then 14 more over the structural detector and killed 13. Every
-one of those survivors is a deliberate control except the day 4 mutant of a test, which is
-what the detector was pulled into its own module to fix.
+Day 4 ran 17 and killed 15, then 14 more over the structural detector and killed 13. Day 5
+ran 15 and killed 14. Day 6 ran 30 over two rounds and killed all of them after six fixes.
+Day 7 ran 20 and killed 18, then 22 and killed all 22.
 
-The one real survivor on the day 1 pass was the cell ordering mutant above. It is now
-killed.
+Every survivor across the week was either a deliberate control, an unreachable branch that
+was kept for a stated reason, or a real gap that became a test. Two of them were live
+defects in the code of the day that found them.
