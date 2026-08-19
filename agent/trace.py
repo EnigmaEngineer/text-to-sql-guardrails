@@ -1,13 +1,13 @@
 """What the agent did, in order, across every attempt it made.
 
-The blueprint calls the trace "the interesting bit" of this project and it is right. A
+I called the trace "the interesting bit" of this project and it is right. A
 guardrail that refuses is only useful if someone can see which layer refused and why.
 
 Kept separate from `agent.pipeline` because a trace is a value and the loop is a
 procedure. The loop builds one and hands it back. Nothing here decides anything, which
 means the renderer can be changed without touching the thing being traced.
 
-`render` returns text rather than HTML. The blueprint names a viewer and lists Streamlit
+`render` returns text rather than HTML. The plan named a viewer and listed Streamlit
 among the technologies. There is no browser in the environment this repo is built in, so
 a Streamlit app here would be a file nobody has ever run. Text renders in a terminal, in
 a log and in a Slack message, and it is checkable by a test. See `docs/adr-0010`.

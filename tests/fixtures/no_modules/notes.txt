@@ -1,7 +1,7 @@
 A directory with no python in it.
 
 The detector must refuse this rather than report it clean. This is the case that has
-caught four separate checks in this program, most recently on day 4, where a validator
+caught four separate checks in my own tooling, most recently the catalog validator, where it
 walked the base tables of a query that had none and reported no problem.
 
 This file is here because git does not track an empty directory, and because a plain

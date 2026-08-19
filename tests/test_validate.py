@@ -1,6 +1,6 @@
 """Checks on static validation.
 
-The fixture rule from 2026-08-02 applies here more than anywhere else in this repo. A
+The fixture rule applies here more than anywhere else in this repo. A
 validator tested only on queries with one table cannot test any rule about how two
 tables relate, so the join checks below use real joins over real tables rather than a
 hand built shape.
@@ -134,7 +134,7 @@ def check_a_derived_table_alias_is_not_reported_as_unknown(ctx):
 
 
 def check_table_function_is_refused(ctx):
-    """The one the day 3 gate approves and runs."""
+    """The one the parser gate approves and runs."""
     tables = _tables(ctx)
     for sql in (
         "SELECT * FROM read_csv('/etc/hostname')",
@@ -159,7 +159,7 @@ def check_a_query_reading_no_table_is_refused(ctx):
     """The vacuous pass, made loud.
 
     `SELECT 42` refers to nothing, so every name check has nothing to check and reports
-    nothing wrong. Third time this program has met a check that passes on zero inputs.
+    nothing wrong. Third time I have met a check that passes on zero inputs.
     """
     r = validate.check(ctx.con, _tables(ctx), "SELECT 42")
     eq(r.codes(), ("no_relation",), "codes")
@@ -236,7 +236,7 @@ def check_report_serialises_for_the_trace(ctx):
     eq(payload["findings"][0]["code"], "no_relation", "finding code survives")
 
 
-# --- ot-035, closed on day 7 --------------------------------------------------------
+# --- the self join false refusal -----------------------------------------------------
 #
 # `unrelated_join` counted distinct real tables until today, so a self join resolved both
 # aliases to one table and every self join was refused. No gold query self joins, so the
@@ -287,9 +287,9 @@ def check_a_constant_join_condition_is_still_refused(ctx):
 
 
 def check_a_join_to_a_cte_is_allowed(ctx):
-    """Found by a surviving mutant on day 7, not by anyone reading the rule.
+    """Found by a surviving mutant, not by anyone reading the rule.
 
-    The first ot-035 fix still filtered join qualifiers through the catalog, so a CTE
+    The first fix for it still filtered join qualifiers through the catalog, so a CTE
     alias did not count as a side and every join to a CTE was refused. This query runs
     and returns rows.
     """

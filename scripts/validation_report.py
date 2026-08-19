@@ -2,9 +2,9 @@
 
     python3 scripts/validation_report.py --db /tmp/p10/wh.duckdb
 
-The point of this script is the first column. Day 3's gate asks DuckDB whether a string
+The point of this script is the first column. The parser gate asks DuckDB whether a string
 is one read. Every probe below that it approves is a query the agent would have run
-yesterday. The second column is day 4.
+yesterday. The second column is static validation.
 
 Where a probe is approved by the gate alone, this actually runs it and reports what came
 back, because "would have been allowed" is a weaker claim than "returned 95 rows of your
@@ -91,7 +91,7 @@ def approve_cost(con, tables, gold_rows):
     """What approval costs against what running the query costs.
 
     This lived in the README as hand arithmetic from 08-10 and went stale the next day,
-    because day 5 put `EXPLAIN` inside `guard.approve` and doubled it. The figure was
+    because the cost layer put `EXPLAIN` inside `guard.approve` and doubled it. The figure was
     still true of the call it described and no longer true of the call the pipeline
     makes. Nothing produced it, so nothing could catch it. It is measured here instead.
     """
@@ -107,7 +107,7 @@ def approve_cost(con, tables, gold_rows):
     print("  %-34s %8.2f ms   %5.1f %% of execute" % (
         "gate and validate only", without, 100.0 * without / execute))
     print("  %-34s %8.2f ms   %5.1f %% of execute" % (
-        "with the day 5 cost layer", with_cost, 100.0 * with_cost / execute))
+        "with the cost layer", with_cost, 100.0 * with_cost / execute))
     print("  %-34s %8.2f ms" % ("running the same queries", execute))
     print()
     print("  The cost layer adds %.2f ms, which is %.1fx the rest of approval put"
@@ -121,7 +121,7 @@ def main(db_path, json_path=None):
     con = role.connect(db_path)
     tables = catalog.read(con)
 
-    print("PROBES: what each layer says, and what happens with only the day 3 gate")
+    print("PROBES: what each layer says, and what happens with only the parser gate")
     print()
     print("  %-38s %-9s %-22s %s" % ("probe", "gate", "validation", "if only the gate"))
     gate_allowed = validation_caught = 0
@@ -149,7 +149,7 @@ def main(db_path, json_path=None):
               % (label[:38], "allows" if decision.allowed else "refuses", codes, outcome))
 
     print()
-    print("  the day 3 gate alone approves %d of %d probes" % (gate_allowed, len(PROBES)))
+    print("  the parser gate alone approves %d of %d probes" % (gate_allowed, len(PROBES)))
     print("  static validation refuses %d of those %d" % (validation_caught, gate_allowed))
 
     print()
@@ -189,7 +189,7 @@ def main(db_path, json_path=None):
     print("  q029 is caught, and not for the reason the eval set gives. It is labelled")
     print("  unbounded_scan and the cross join rule is what stops it. q028 is the same")
     print("  category with no cross join in it and nothing here touches it. Counting q029")
-    print("  as cost coverage would be claiming a day 5 result on day 4.")
+    print("  as cost coverage would be claiming a cost result for validation.")
 
     print()
     approve_cost(con, tables, rows)

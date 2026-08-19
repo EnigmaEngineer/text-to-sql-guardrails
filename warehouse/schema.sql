@@ -3,7 +3,7 @@
 -- Snowflake types, because there is no Snowflake account to verify against yet.
 --
 -- The table count is meant to be awkward rather than large. Eighteen tables render in
--- 2,716 characters, measured on 2026-08-07, which fits in any prompt worth using. Day 2
+-- 2,716 characters, which fits in any prompt worth using. The retrieval layer
 -- measured retrieval against that and found it does not pay here. See docs/adr-0005.
 
 CREATE SCHEMA IF NOT EXISTS retail;
@@ -97,7 +97,7 @@ CREATE TABLE retail.dim_employee (
 
 -- order_total is stored on the header and is NOT the sum of the lines. It is the sum of
 -- the lines minus the header level discount. A join that sums net_amount and compares it
--- to order_total will disagree, on purpose. Day 4 has to catch that class of mistake.
+-- to order_total will disagree, on purpose. Static validation has to catch that class.
 CREATE TABLE retail.fct_order_header (
     order_id        BIGINT PRIMARY KEY,
     customer_id     INTEGER NOT NULL,

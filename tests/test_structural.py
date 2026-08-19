@@ -1,12 +1,12 @@
 """Tests for the detectors in `tests/structural.py`.
 
-This file exists because of `ot-034`. The one door check in `test_guard.py` was the most
-important thing day 4 produced and it was the only thing in the repo whose behaviour had
+This file exists because a check cannot be tested from inside itself. The one door check in `test_guard.py` was the most
+important thing static validation produced and it was the only thing in the repo whose behaviour had
 never been demonstrated by anything except a person trying it once.
 
 Two halves. The detector must find a defect that is really there, and it must refuse
 when it was handed nothing to look at. The second half is the one that keeps being
-skipped, here and in the tooling around this program.
+skipped, here and in the tooling around it.
 """
 
 import os

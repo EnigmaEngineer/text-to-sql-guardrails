@@ -1,6 +1,6 @@
 """Detectors that read the code instead of running it.
 
-`ot-034`. `tests/test_guard.py` carries a check that generated SQL can only reach the
+a gap I could not close from the inside. `tests/test_guard.py` carries a check that generated SQL can only reach the
 database through one door. Nothing tested that check. A mutant that pulled its teeth out
 survived the whole suite, which is what you would expect, because a test is not itself
 under test. The behaviour was confirmed by hand instead, by adding a real second door to
@@ -12,10 +12,10 @@ small modules with defects planted in them on purpose. The detector is then a th
 its own passing tests, and the manual demonstration becomes a check that runs every time.
 
 Every detector raises `NothingToCheck` rather than returning a clean empty result. Four
-checks in this program have already passed by looking at nothing. `prose_check.py`
-reported clean on a repo path that did not exist. The day 3 gate approved a string of
+checks in my own tooling have already passed by looking at nothing. `prose_check.py`
+reported clean on a repo path that did not exist. The parser gate approved a string of
 semicolons that parsed to zero statements. `depcheck.py` printed a total across zero
-repos and exited 0. The day 4 validator found no base tables in a query that read the
+repos and exited 0. The catalog validator found no base tables in a query that read the
 host filesystem and reported no problem. A detector that answers "nothing wrong here"
 when it was handed nothing is the fifth one waiting.
 """

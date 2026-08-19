@@ -1,12 +1,11 @@
 # ADR 0001: DuckDB is the verified warehouse, Snowflake is written alongside
 
-Date: 2026-08-07
 Status: accepted
 
 ## Context
 
-The project targets Snowflake. There is no Snowflake account. Day 5 has to estimate query
-cost from `EXPLAIN` output and day 7 has to publish accuracy numbers, and both of those
+The project targets Snowflake. There is no Snowflake account. The cost layer has to estimate query
+cost from `EXPLAIN` output and the write-up has to publish accuracy numbers, and both of those
 are worthless if they were never executed anywhere.
 
 Two bad options were available. Write Snowflake SQL and never run it, which produces a
@@ -25,7 +24,7 @@ every cost number the project publishes becomes unfounded, so the flag is worth 
 
 Cost estimation is the part that suffers. DuckDB's `EXPLAIN` gives a plan and a row
 estimate. Snowflake's `EXPLAIN USING JSON` gives bytes scanned and partition counts, which
-is a different and better input to a spend ceiling. Day 5 will build the ceiling against
+is a different and better input to a spend ceiling. The cost layer will build the ceiling against
 what DuckDB offers and the Snowflake mapping stays unverified.
 
 The honest statement in the README is that the cost model was tuned on one engine and

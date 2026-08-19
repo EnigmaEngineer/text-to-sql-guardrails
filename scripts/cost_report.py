@@ -156,7 +156,7 @@ def main(db_path, json_path, scratch):
           % cost.read_plan(guard.plan_of(con, PROBES[0][1])).peak_rows)
     print("  a real question that reads the same table with no filter. Their plans cost")
     print("  the same. No ceiling separates them, so cost coverage of the eval set is 0.")
-    print("  q029 was already refused by the day 4 cross join rule and is not new either.")
+    print("  q029 was already refused by the cross join rule and is not new either.")
 
     payload = {
         "ceiling": ceiling,
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     # another user the write fails inside DuckDB and surfaces as
     # "INTERNAL Error: Attempted to dereference unique_ptr that is NULL", which says
     # nothing about a path and sends you looking at the query. Same shape as the fixed
-    # path that poisoned the day 4 mutation run.
+    # path that poisoned an early mutation run.
     ap.add_argument("--scratch", default=None,
                     help="where the profiler writes. A private temp file by default.")
     a = ap.parse_args()

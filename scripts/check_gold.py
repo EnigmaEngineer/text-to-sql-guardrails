@@ -4,7 +4,7 @@
     python3 scripts/check_gold.py --db /tmp/p10/wh.duckdb
 
 Prints the row shape of each gold answer, the collision report and the power floor. All
-three are inputs to the day 1 decision about whether this eval set is usable at all.
+three are inputs to the first decision about whether this eval set is usable at all.
 """
 
 import argparse
@@ -51,7 +51,7 @@ def main(db_path):
     print("largest single table rendering:     %d chars"
           % max(len(t.render()) for t in tables))
     # Deliberately NOT converted to tokens. The tokeniser belongs to the model and the
-    # model is a day 2 decision. Setting a token budget first was the mistake on P3.
+    # model is a the retrieval layer decision. Setting a token budget first was the mistake on P3.
     con.close()
     return 0
 

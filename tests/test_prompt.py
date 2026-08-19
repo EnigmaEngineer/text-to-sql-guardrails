@@ -11,10 +11,10 @@ from warehouse import catalog
 # One example of SQL that breaks each rule, in the order the rules are written. A rule
 # with no example here fails the coupling check below rather than passing quietly.
 # Every rule the prompt states must appear here exactly once, as either SQL that gets
-# refused or an explicit note that it is not a SQL rule. On day 3 this was a list of four
+# refused or an explicit note that it is not a SQL rule. On the gate this was a list of four
 # against a RULES tuple of six, and the check that iterated it was called
 # "every stated rule is enforced". It checked every rule someone had remembered to add.
-# The two it skipped were the schema rule, which day 4 is about, and the refusal token.
+# The two it skipped were the schema rule, which static validation is about, and the refusal token.
 # It now iterates RULES, so a new rule with no enforcement fails the suite.
 BREAKS_RULE = [
     ("Return exactly one", "SELECT 1; SELECT 2"),
@@ -46,7 +46,7 @@ def check_sizes_add_up(ctx):
 
 
 def check_schema_block_matches_the_published_size(ctx):
-    """Day 1 published 2,716 characters for the whole schema. Same renderer, same number.
+    """The first cut published 2,716 characters for the whole schema. Same renderer, same number.
 
     Pinned so a schema change cannot move a figure the ADRs argue from without something
     failing first.
@@ -109,8 +109,8 @@ def check_every_stated_rule_is_enforced(ctx):
     """Each rule in the prompt maps to SQL that is really refused, or is accounted for.
 
     Driven off `RULES` rather than off the fixture list, so adding a rule to the prompt
-    without enforcing it fails here. That was the hole in the day 3 version of this
-    check and it is the same shape as `ot-026`.
+    without enforcing it fails here. That was the hole in the first version of this
+    check and it is the same one door shape.
     """
     from warehouse import catalog
 

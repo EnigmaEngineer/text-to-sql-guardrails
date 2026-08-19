@@ -1,4 +1,4 @@
-"""Checks on the day 7 scorecard, and on the `layers` argument it needed.
+"""Checks on the scorecard, and on the `layers` argument it needed.
 
 The three that matter most run no SQL.
 
@@ -8,12 +8,12 @@ just removed as unnecessary. That is the shape of every measurement error this p
 has caught, which is a check being right about the wrong thing.
 
 `check_the_matching_reading_is_not_refused_minus_one` exists because that is exactly what
-`scripts/trace_report.py` printed on day 6. It was correct on the day and it was
-arithmetic rather than a definition, and `ot-037` is the thread about figures with no
+`scripts/trace_report.py` used to print. It was correct at the time and it was
+arithmetic rather than a definition, and the whole problem is figures with no
 producer behind them. The fixture here has a gap of two, so anything subtracting one
 fails.
 
-`check_the_owner_table_is_driven_off_the_eval_set` is the 08-10 lesson from this program.
+`check_the_owner_table_is_driven_off_the_eval_set` is a lesson I have learned the hard way.
 A coupling check that iterates a list beside the thing it is checking will pass while
 missing whatever nobody remembered to add.
 """
@@ -198,7 +198,7 @@ def check_nothing_in_agent_passes_the_layers_argument():
 
 
 def check_taking_the_cost_layer_away_changes_nothing_on_this_set(ctx):
-    """Not a happy check. It is the day 7 finding and it is pinned so it cannot drift.
+    """Not a happy check. It is the scorecard finding and it is pinned so it cannot drift.
 
     If a later change makes the cost layer refuse something in the frozen set, this fails
     and the README paragraph built on it has to be rewritten. That is the intent.
@@ -218,7 +218,7 @@ def check_taking_the_cost_layer_away_changes_nothing_on_this_set(ctx):
 
 
 def check_running_cost_first_crashes_rather_than_refusing(ctx):
-    """Day 5 put cost last because EXPLAIN binds. Here is the cruder second reason.
+    """The cost layer put cost last because EXPLAIN binds. Here is the cruder second reason.
 
     On a write and on an unknown column the plan request raises out of the guard. A layer
     that explodes instead of refusing cannot be the first one.
@@ -242,7 +242,7 @@ def check_running_cost_first_crashes_rather_than_refusing(ctx):
 
 
 def check_the_lower_bound_reproduces_two_figures_from_an_earlier_project():
-    """Anchors, not self consistency. Both were computed independently on 2026-08-06."""
+    """Anchors, not self consistency. Both were computed independently by hand."""
     eq(round(scorecard.lower_bound(10, 10), 3), 0.741, "10 of 10")
     eq(round(scorecard.lower_bound(3, 10), 3), 0.087, "3 of 10")
 

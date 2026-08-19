@@ -1,6 +1,5 @@
 # ADR 0002: The eval scores the answer, not the SQL string
 
-Date: 2026-08-07
 Status: accepted
 
 ## Context
@@ -19,7 +18,7 @@ Two things are deliberately kept rather than normalised away.
 Row order stays. Three of the questions ask for a top N, and sorting the rows would let a
 system score correct by returning the right rows backwards.
 
-Column order stays. A mutation run on day 1 found this. A version that sorted the cells
+Column order stays. A mutation run found this. A version that sorted the cells
 inside each row passed every other check and would have scored `(revenue, month)` as equal
 to `(month, revenue)`.
 
@@ -33,9 +32,9 @@ The cost is answer collision. Two different questions can return the same thing,
 they do, a system that generates the wrong query for one of them still scores correct.
 `evals/collision.py` measures this rather than assuming it away.
 
-Measured on day 1 across the 22 answerable questions: zero colliding groups, and 7 answers
+Measured across the 22 answerable questions: zero colliding groups, and 7 answers
 that are a single row and a single column. Those 7 are the exposure. A one cell answer is
 far easier to reach by accident than a 20 row table.
 
-Zero collisions today is a property of these numbers, not a guarantee. The check runs in
+Zero collisions is a property of these numbers, not a guarantee. The check runs in
 the test suite so a future change to the seed cannot introduce one quietly.

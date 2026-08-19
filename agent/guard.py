@@ -1,10 +1,10 @@
 """The one door model-produced SQL goes through to reach the database.
 
-Day 3 left two ways to run a query. `role.run` gated on the parser and executed, and
+The gate left two ways to run a query. `role.run` gated on the parser and executed, and
 `pipeline.answer` gated on the parser and then called `con.execute` itself. Both were
-correct on the day. Neither knew about the catalog, so when day 4 added static
-validation there would have been two places to remember to add it, and `ot-026` is the
-open thread that says a rule a caller has to remember to invoke is a rule that is
+correct at the time. Neither knew about the catalog, so when I added static
+validation there would have been two places to remember to add it, and a rule a caller
+has to remember to invoke is a rule that is
 optional. So `role.run` is gone and this is the only path.
 
 Order matters and it is not arbitrary:
@@ -19,7 +19,7 @@ the tree of a string that is not a query is how a validator ends up reporting a
 `BinderException` as a schema problem. It also means a stacked exfiltration is refused
 before this module has looked at a single column name.
 
-Day 5 put the cost estimate last, and that position was measured rather than assumed.
+The cost layer put the cost estimate last, and that position was measured rather than assumed.
 **`EXPLAIN` is not a dry run.** It binds the query, and binding a table function opens
 the thing the function points at. `EXPLAIN (FORMAT JSON) SELECT * FROM
 read_csv('/tmp/probe.csv')` came back with `Projections: ["a", "b"]`, which are the
@@ -74,7 +74,7 @@ def plan_of(con, sql, dialect=None):
     This is here and not in `agent.cost` because it is an `.execute()` handed something
     that is not a literal, and the whole rule of this module is that those live behind
     one door. `tests/structural.py` enforces that by reading the code, and the fixture it
-    reads was written on day 4 with a `plan()` helper in it, before this function
+    reads was written with a `plan()` helper in it, before this function
     existed. The convention predicted its own first real user.
 
     The prefix comes from the dialect record rather than from a string here, so the
@@ -165,7 +165,7 @@ def _after_validation(con, sql, ceiling, layers, decision, report):
         # A plan the engine refuses to PRODUCE is a different case and it is deliberately
         # not caught here. `EXPLAIN` binds, so it raises on a write and on a query naming
         # a relation that does not exist, and both of those are refused by a layer above
-        # before this line runs. The day 7 ablation depends on that exception escaping.
+        # before this line runs. The ablation depends on that exception escaping.
         # Swallowing it would make a cost-only arm look like it refuses a DELETE, which
         # it does not. What it does is fail to plan one. See `docs/adr-0011`.
         return Verdict(
@@ -211,14 +211,14 @@ def execute(con, tables, sql, ceiling=None):
     try:
         verdict = approve(con, tables, sql, ceiling)
     except Exception as exc:                                # noqa: BLE001
-        # `approve` can raise, and the day 7 audit found a query that does it. `EXPLAIN`
+        # `approve` can raise, and a later review found a query that does it. `EXPLAIN`
         # binds, so a qualifier that no relation defines raises a `BinderException` out
         # of the cost layer. Validation catches that when the statement has no CTE and no
         # subquery, and it cannot when there is one, because resolving a name through a
         # derived table is the binder's job.
         #
         # The catch is here rather than inside `approve` on purpose. This function is the
-        # one documented never to raise. `approve` is also what the day 7 ablation calls,
+        # one documented never to raise. `approve` is also what the ablation calls,
         # and an ablation that never saw an exception would report a cost-only guard as
         # refusing a `DELETE` when what it really does is fail to plan one.
         return Result(

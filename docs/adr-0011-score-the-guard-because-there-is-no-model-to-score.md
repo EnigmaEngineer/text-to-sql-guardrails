@@ -1,13 +1,13 @@
 # ADR-0011: score the guard, because there is no model to score
 
-Date: 2026-08-12 through 2026-08-13. Status: accepted.
+Status: accepted.
 
 ## Context
 
-The plan for day 7 says "README with accuracy numbers on the eval set." Accuracy on a
+The plan says "README with accuracy numbers on the eval set." Accuracy on a
 text to SQL set is a property of whatever writes the SQL. Nothing in this repo has ever
 called a model. `agent/generate.py` ships two replay fixtures and a backend that raises,
-and its docstring has said since day 3 that a score taken with a fixture is a statement
+and its docstring has said from the start that a score taken with a fixture is a statement
 about that file.
 
 So there are three ways to spend the last day.
@@ -30,7 +30,7 @@ Three things follow from taking it seriously.
 **The two halves are not the same kind of evidence and they are never pooled silently.**
 The 22 answerable questions are run as their gold SQL. That half is in sample by
 construction. Three checks in `tests/` fail the build if any layer refuses a gold query,
-and day 4's first column rule refused six of them and was rewritten rather than accepted.
+and the first column rule refused six of them and was rewritten rather than accepted.
 So the 22 record a green test. The 8 refuse-tagged questions are run as hand written
 plausible SQL from `evals/reach.py`, which is the weak input and the only out of sample
 half.
@@ -73,8 +73,8 @@ percent lower bound on 5 of 8 is 0.289.
 | validate only | 27 | 5 of 8 | 1 of 8 | 0 |
 | cost only | 23 | 1 of 8 | 1 of 8 | 4 |
 
-**Removing the cost layer changes nothing on this set.** A whole day of work, and the
-frozen questions cannot see it. Day 5 said this in words. The ablation makes it a number,
+**Removing the cost layer changes nothing on this set.** All that work, and the
+frozen questions cannot see it. The cost layer said this in words. The ablation makes it a number,
 and `check_taking_the_cost_layer_away_changes_nothing_on_this_set` pins it so that a
 later change which makes the cost layer earn its place fails the suite and forces this
 paragraph to be rewritten.
@@ -88,7 +88,7 @@ repo quoting one number would have concluded the gate was redundant.
 
 **The cost layer alone raises on four questions instead of refusing them.** `EXPLAIN` on
 a `DELETE` over a read-only connection is an `InvalidInputException`, and `EXPLAIN` on an
-unknown column is a `BinderException`. Day 5 put cost last on the argument that `EXPLAIN`
+unknown column is a `BinderException`. The cost layer put cost last on the argument that `EXPLAIN`
 binds and binding a table function opens what it points at. Here is the cruder second
 reason. Run first, it does not refuse. It explodes.
 

@@ -1,15 +1,14 @@
 # ADR 0005: Retrieval is kept, off by default, and its prize is measured
 
-Date: 2026-08-08
 Status: accepted
 
 ## Context
 
-`adr-0004` measured the whole schema at 2,716 characters and said day 2 had to do one of
+`adr-0004` measured the whole schema at 2,716 characters and said this layer had to do one of
 two things. Widen the warehouse until retrieval earns its place, or state that the layer
 is for the wide case and measure what it costs on the narrow one.
 
-Day 2 took the second. Widening the warehouse to make a layer look necessary is arranging
+The retrieval layer took the second. Widening the warehouse to make a layer look necessary is arranging
 the evidence to fit the plan.
 
 ## What was measured
@@ -24,7 +23,7 @@ retrieved. A question needing four tables that gets three is not three quarters 
 generated SQL cannot be correct at all. So this is a ceiling on end to end accuracy and
 not a score.
 
-Measured 2026-08-08 by `scripts/retrieval_report.py`.
+Measured by `scripts/retrieval_report.py`.
 
 | retriever | k | complete | mean prompt chars |
 |---|---|---|---|
@@ -62,16 +61,16 @@ of the baseline. What does not move is the size of the prize. Around 550 charact
 way, on a schema of 2,716. A layer whose maximum benefit is smaller than the noise in how
 its baseline handles plurals is not carrying its weight on this warehouse.
 
-The layer stays because the guardrails on days 3 through 6 need a table set to validate
+The layer stays because the guardrails downstream need a table set to validate
 against, and because a wide warehouse is the case the project is written for. What it does
 not get is a sentence implying it was necessary here.
 
 ## Consequences
 
-Day 7 reports accuracy with the whole schema in the prompt. Retrieval numbers sit beside
+The scorecard reports accuracy with the whole schema in the prompt. Retrieval numbers sit beside
 it as a separate column, not as the headline.
 
-Two findings are carried forward rather than fixed today.
+Two findings are carried forward rather than fixed here.
 
 `dim_date` cannot be retrieved by anything in this repo. Six questions need it and not one
 of them contains the word date. Its primary key is `date_key` and the fact tables carry

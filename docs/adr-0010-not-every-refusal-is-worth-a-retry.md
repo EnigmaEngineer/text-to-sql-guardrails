@@ -1,10 +1,10 @@
 # adr-0010: not every refusal is worth a retry, and the trace is text
 
-Day 6. Status: accepted.
+Status: accepted.
 
 ## Context
 
-The blueprint asks for a self correction loop capped at two retries, and a trace viewer.
+The plan asks for a self correction loop capped at two retries, and a trace viewer.
 The loop is about forty lines. Everything interesting is in what surrounds it.
 
 There is no model in the environment this repo is built in, which is recorded in
@@ -59,8 +59,8 @@ read by anything. `SequenceGenerator` exists because of that and
 
 ## Decision four: the trace renders as text
 
-The blueprint lists Streamlit. There is no browser here, so a Streamlit app in this repo
-would be a file nobody has ever run, and this program has a standing rule against shipping
+The plan listed Streamlit. There is no browser here, so a Streamlit app in this repo
+would be a file nobody has ever run, and I have a standing rule against shipping
 components that have never executed.
 
 Text renders in a terminal, in a log and in a Slack message, and a test can assert on it.
@@ -75,7 +75,7 @@ Three of the fourteen are produced by anything other than a test. That is the nu
 sitting with. Most of the correction policy has never met a real input.
 
 A full retry budget costs about 1.5x a clean run rather than 3x, because a refused attempt
-is judged and never executed. Measured on the 22 answerable questions on 2026-08-12, median
+is judged and never executed. Measured on the 22 answerable questions, median
 of seven repeats after a discarded warmup, 59.9 ms against 90.3 ms. Only the ratio survives
 a different machine.
 

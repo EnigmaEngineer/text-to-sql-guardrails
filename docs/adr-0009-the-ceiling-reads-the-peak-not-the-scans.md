@@ -1,10 +1,10 @@
 # ADR 0009: the cost ceiling reads the largest step, not the sum of the scans
 
-Date: 2026-08-11. Day 5.
+Status: accepted.
 
 ## Context
 
-The blueprint line for today is cost estimation via `EXPLAIN` with a configurable
+The next piece is cost estimation via `EXPLAIN` with a configurable
 ceiling. `EXPLAIN (FORMAT JSON)` on duckdb 1.5.5 returns a plan tree where most nodes
 carry an `Estimated Cardinality`. Something has to be turned into a number and compared
 against a limit. Three candidates were on the table.
@@ -17,7 +17,7 @@ against real answers of 4, 12 and 20 rows. Two carry a real number. So the most 
 ceiling, on how much comes back, cannot be built from this plan at all.
 
 **Summing the scan nodes does not separate anything.** The query this layer exists for is
-a join whose condition names two real tables, so day 4 approves it cleanly:
+a join whose condition names two real tables, so static validation approves it cleanly:
 
 ```sql
 SELECT count(*) FROM retail.fct_order_line l
@@ -43,7 +43,7 @@ compared against the sum of `duckdb_tables().estimated_size` across the schema, 
 The ceiling comes off the warehouse rather than out of the eval set on purpose. The
 argument is that no question anyone types should make the engine handle more rows than
 the warehouse holds. That reason survives a follow up question. Picking a number that
-sits in a measured gap between the answer key and the attacks does not, and this program
+sits in a measured gap between the answer key and the attacks does not, and I
 has already refused to do that once, on 08-06.
 
 A plan carrying an operator with no estimate is refused rather than scored. The safe list
@@ -61,7 +61,7 @@ default.
 ## What this costs, stated plainly
 
 **It buys no coverage on the eval set.** Two questions are tagged `unbounded_scan`. q029
-was already refused by the day 4 cross join rule. q028 asks for every row of
+was already refused by the cross join rule. q028 asks for every row of
 `fct_web_session`, which the plan estimates at 40,000. q009 is a real analytical question
 that reads the same table with no filter, and it estimates at 40,000 too. Their plans are
 the same cost. No ceiling can separate them, because the difference between them is what
@@ -112,11 +112,11 @@ have hurt.
 
 ## Consequences
 
-- One more refusal reason for day 6 to feed back to a model, and it is actionable. Over
+- One more refusal reason for the correction loop to feed back to a model, and it is actionable. Over
   the ceiling means add a filter. Unscored operator means name your join keys.
 - `agent.guard.plan_of` is a second `.execute()` of model text and it lives behind the
-  same door as the first. The day 4 structural check refused an earlier draft that built
+  same door as the first. The structural check refused an earlier draft that built
   eighteen `count(*)` statements by string formatting, and it was right to.
 - The Snowflake prefix stays in `warehouse/adapter.py` and is still unverified. Snowflake
   returns a different plan document, so `cost.read_plan` is written against DuckDB's shape
-  and would need a second reader. Tracked under `ot-033`.
+  and would need a second reader. Left as a named next step.

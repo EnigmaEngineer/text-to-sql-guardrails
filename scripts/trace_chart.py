@@ -1,6 +1,6 @@
 """One picture of the correction policy and what actually reaches it.
 
-    python3 scripts/trace_chart.py --db /tmp/wh.duckdb --out docs/day6_policy.png
+    python3 scripts/trace_chart.py --db /tmp/wh.duckdb --out docs/correction_policy.png
 
 Fourteen refusal codes on the vertical. Three things said about each. Whether the policy
 coaches it, whether the refusal carries a fact the prompt did not, and whether anything
@@ -92,7 +92,7 @@ def main(db_path, out):
     fig.text(
         0.01, 0.015,
         "Codes read out of agent/ with ast, not listed by hand. "
-        "Reach measured over the frozen eval set. p10 day 6.",
+        "Reach measured over the frozen eval set. p10 the correction loop.",
         fontsize=7.5, color="#4a5568",
     )
     fig.tight_layout()
@@ -107,6 +107,6 @@ def main(db_path, out):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=os.path.join(ROOT, "warehouse", "retail.duckdb"))
-    ap.add_argument("--out", default=os.path.join("docs", "day6_policy.png"))
+    ap.add_argument("--out", default=os.path.join("docs", "correction_policy.png"))
     a = ap.parse_args()
     sys.exit(main(a.db, a.out))

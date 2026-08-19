@@ -2,7 +2,7 @@
 
 The first check in this file is the one that decides whether the layer ships. A
 guardrail is judged first on what it refuses that it should not, and the answer key is
-the set that must never be refused. Day 4 shipped a column rule that blocked 6 of the 22
+the set that must never be refused. Static validation shipped a column rule that blocked 6 of the 22
 gold queries and only found out by running it over them.
 """
 
@@ -12,7 +12,7 @@ from agent import cost, guard, role, validate
 from tests.harness import eq, raises, true
 from warehouse import catalog
 
-# A join whose condition names two real tables, so day 4 approves it, and which asks the
+# A join whose condition names two real tables, so static validation approves it, and which asks the
 # engine for 223 million rows. This is the query the cost layer exists for.
 INEQUALITY_JOIN = (
     "SELECT count(*) FROM retail.fct_order_line l "
@@ -51,7 +51,7 @@ def check_the_ceiling_refuses_nothing_in_the_answer_key(ctx):
 
 def check_the_answer_key_is_not_hugging_the_ceiling(ctx):
     """Headroom, not calibration. A ceiling sitting just above the answer key would be
-    tuned to it, which is the thing this program keeps catching itself doing."""
+    tuned to it, which is the thing I keep catching myself doing."""
     ceiling = cost.warehouse_ceiling(ctx.con)
     peak = max(
         cost.read_plan(guard.plan_of(ctx.con, sql)).peak_rows for _qid, sql in _gold()
@@ -62,7 +62,7 @@ def check_the_answer_key_is_not_hugging_the_ceiling(ctx):
 def check_a_join_day_four_approves_is_refused_on_cost(ctx):
     tables = _tables(ctx)
     report = validate.check(ctx.con, tables, INEQUALITY_JOIN)
-    true(report.ok, "day 4 has no objection: %s" % (report.codes(),))
+    true(report.ok, "static validation has no objection: %s" % (report.codes(),))
 
     verdict = guard.approve(ctx.con, tables, INEQUALITY_JOIN, cost.warehouse_ceiling(ctx.con))
     true(not verdict.allowed, "refused")
@@ -173,7 +173,7 @@ def check_the_ceiling_comes_off_the_warehouse_and_not_a_constant(ctx):
 
 
 def check_the_estimate_survives_a_round_trip_to_json(ctx):
-    """Day 6 puts this in a trace. A dataclass that will not serialize is not usable."""
+    """The correction loop puts this in a trace. A dataclass that will not serialize is not usable."""
     verdict = guard.approve(
         ctx.con,
         _tables(ctx),
@@ -196,7 +196,7 @@ def check_no_ceiling_means_no_cost_check(ctx):
 def check_explain_is_not_reached_before_validation_refuses(ctx):
     """`EXPLAIN` binds, and binding a table function opens the file it names.
 
-    Measured 2026-08-11. `EXPLAIN` on `read_csv` of a path that does not exist raises
+    Measured. `EXPLAIN` on `read_csv` of a path that does not exist raises
     `IOException: No files found`, so a cost layer placed in front of validation would
     do the filesystem read that validation exists to prevent. The assertion is that the
     verdict stops at validate and that no plan was taken.
@@ -266,11 +266,11 @@ def check_an_unscoreable_plan_refuses_rather_than_approving(ctx):
 
 
 def check_the_pipeline_cannot_reach_the_cost_layer_around_the_door():
-    """`ot-026`, applied a second time.
+    """One door, applied a second time.
 
-    A ceiling the caller invokes is a ceiling the caller can forget. The day 4 answer was
+    A ceiling the caller invokes is a ceiling the caller can forget. The static validation answer was
     to compose the layers inside `agent.guard` and let nothing else touch them, and the
-    day 5 layer went in the same place. This pins that the pipeline still asks for one
+    the cost layer layer went in the same place. This pins that the pipeline still asks for one
     thing and gets all three.
     """
     import os
@@ -300,7 +300,7 @@ def check_the_gate_still_runs_before_the_estimate(ctx):
 
 
 def check_a_limit_without_an_order_by_is_not_refused(ctx):
-    """Found on day 7. `LIMIT` and `STREAMING_LIMIT` carry no estimate.
+    """Found late. `LIMIT` and `STREAMING_LIMIT` carry no estimate.
 
     Every gold query that limits also orders, which plans as `TOP_N`, so neither name
     appears in the answer key and the answer key check stayed green while ordinary SQL

@@ -1,6 +1,6 @@
 """Warehouse dialect adapter.
 
-There is no Snowflake account on this program yet, so every day is verified against
+There is no Snowflake account behind this, so every day is verified against
 DuckDB and the Snowflake path is written alongside and left unverified until a trial
 account is available. The point of this file is that the Snowflake strings are visible
 and reviewable now rather than invented in a hurry at the end.
@@ -17,7 +17,7 @@ class Dialect:
     name: str
     # Snowflake folds unquoted identifiers to upper case, DuckDB to lower. This decides
     # whether a validator comparing a generated column name against the catalog should
-    # casefold up or down, which is day 4's problem and is easy to get backwards.
+    # casefold up or down, which is static validation's problem and is easy to get backwards.
     unquoted_case: str
     explain_prefix: str
     verified: bool
@@ -47,7 +47,7 @@ def snowflake() -> Dialect:
     return Dialect(
         name="snowflake",
         unquoted_case="upper",
-        # EXPLAIN USING JSON is what day 5 will want, because the text form has to be
+        # EXPLAIN USING JSON is what the cost layer will want, because the text form has to be
         # parsed and the JSON form carries bytesScanned directly.
         explain_prefix="EXPLAIN USING JSON",
         verified=False,

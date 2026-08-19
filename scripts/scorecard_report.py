@@ -2,13 +2,13 @@
 
     python3 scripts/scorecard_report.py --db /tmp/wh.duckdb
 
-Day 7 of the plan asks for accuracy numbers. There is no model in this repo, so there is
+The plan asks for accuracy numbers. There is no model in this repo, so there is
 no accuracy number to print and this script says so rather than printing something that
 looks like one. What it prints instead is the guard scored against the frozen set, the
 two degenerate arms that bracket it, and a layer ablation.
 
 The measuring lives in `evals/scorecard.py`. This file arranges it on a page. That split
-is the 08-06 rule on this program, which is that a number deciding anything belongs where
+is a rule I work to, which is that a number deciding anything belongs where
 a mutant can reach it, and nothing in `tests/` imports a script.
 """
 

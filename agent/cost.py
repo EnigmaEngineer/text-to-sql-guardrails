@@ -4,7 +4,7 @@ This module is pure. It reads a plan document and judges it. It never runs anyth
 because running an `EXPLAIN` on model SQL means handing model SQL to the connection and
 that goes through `agent.guard` like everything else. See `guard.plan_of`.
 
-Four things were measured on 2026-08-11 against duckdb 1.5.5 and they decided the whole
+Four things were measured against duckdb 1.5.5 and they decided the whole
 shape of this file.
 
 **The plan's output cardinality is not usable.** Over the 22 answerable gold queries the
@@ -15,7 +15,7 @@ is on work done rather than on rows returned.
 
 **Summing the scans is the wrong metric, and the losing side was built properly before it
 lost.** `SELECT count(*) FROM fct_order_line l JOIN fct_web_session s ON l.quantity >
-s.page_views` passes the day 4 validator cleanly, because its join condition names two
+s.page_views` passes the catalog validator cleanly, because its join condition names two
 real tables. Summing its scan nodes gives 104,357, against a gold maximum of 70,523. That
 is a factor of 1.48 and no ceiling lives in it. The maximum estimate over every node gives
 223,844,302 against a gold maximum of 64,357, which is a factor of 3,478. One plan and one
@@ -43,7 +43,7 @@ from dataclasses import dataclass
 class NothingToEstimate(Exception):
     """Not one node in the plan carried a number. That is a finding, not a clean bill.
 
-    Four checks in this program have passed by looking at nothing. This module is not
+    Four checks in my own tooling have passed by looking at nothing. This module is not
     going to be the fifth.
 
     The first version of this rule was "no base table scan in the plan" and it was
@@ -69,12 +69,12 @@ class NothingToEstimate(Exception):
 #
 # So this list is derived from the one set that must never be refused. These four are
 # every operator that appears with no estimate across the 22 answerable gold queries,
-# measured 2026-08-11. All four reduce or preserve row count. The cost of the inversion
+# measured. All four reduce or preserve row count. The cost of the inversion
 # is that an unfamiliar operator gets refused even when it was harmless, which is the
 # direction a guardrail should fail in, and it surfaces as a refusal someone can read
 # rather than as silence.
 #
-# Two more were added on 2026-08-13 and they did NOT come off the answer key, which is
+# Two more were added later and they did NOT come off the answer key, which is
 # worth stating because the paragraph above says the list is derived from it. `LIMIT` and
 # `STREAMING_LIMIT` carry no estimate, and every gold query that limits also orders, which
 # plans as `TOP_N`. So no gold query produces either name and the answer key check stayed
@@ -104,7 +104,7 @@ class Estimate:
     nodes: int
 
     def as_dict(self):
-        """For the trace. Day 6 wants the number and where it came from."""
+        """For the trace. The correction loop wants the number and where it came from."""
         return {
             "peak_rows": self.peak_rows,
             "scanned_rows": self.scanned_rows,
@@ -182,7 +182,7 @@ def read_plan(plan):
 def judge(estimate, ceiling):
     """Compare an estimate against a ceiling and say which rule decided it.
 
-    Codes are kept apart rather than collapsed into "too expensive", because day 6 has to
+    Codes are kept apart rather than collapsed into "too expensive", because the correction loop has to
     tell a model what to change and "add a filter" and "name your join keys" are
     different instructions.
     """
@@ -222,7 +222,7 @@ def warehouse_ceiling(con, schema="retail"):
     warehouse it lands at 3.2x the most expensive step in the answer key.
 
     `duckdb_tables()` rather than a `count(*)` per table, for two reasons. It is one
-    literal statement instead of eighteen built by string formatting, which the day 4
+    literal statement instead of eighteen built by string formatting, which the static validation
     structural check refused when this was first written, and it was right to. And
     `estimated_size` is the same number the planner puts on a scan node, so the ceiling
     and the thing measured against it come from one source. A ceiling in exact rows

@@ -1,26 +1,24 @@
 # ADR 0008: fixtures for checks that read code
 
 Status: accepted
-Date: 2026-08-10
-
 ## Context
 
-Day 4 added a check that generated SQL can only reach the database through
+Static validation added a check that generated SQL can only reach the database through
 `agent/guard.py`. It walks `agent/` with `ast` and fails if any `.execute()` outside the
 door is handed something that is not a string literal. It is the single most important
 check in the repo, because it is the only one that fails when someone adds a route rather
 than when someone breaks a route that exists.
 
-The day 4 mutation run put a mutant through it that removed the string literal test. The
+An early mutation run put a mutant through it that removed the string literal test. The
 mutant survived. That is not surprising and it is not a bug in the suite. Nothing tests a
 test. The behaviour was confirmed by hand instead, by adding a real second door to the
 pipeline and watching 7 checks go red.
 
 That confirmation worked once and the suite cannot repeat it. So the most important check
-in the repo was, on the day it was written, the least verified thing in it.
+in the repo was, when it was written, the least verified thing in it.
 
-The same shape is coming twice more. Day 5 is a cost ceiling and day 6 is a retry cap, and
-both are rules a caller could forget to invoke. An earlier project in this program had the
+The same shape is coming twice more. A cost ceiling next, then a retry cap, and
+both are rules a caller could forget to invoke. An earlier project of mine had the
 same problem with a quarantine that only one of two report scripts applied.
 
 ## Decision
@@ -45,8 +43,8 @@ files, that is a finding about its input and not a pass. The same holds for a di
 containing nothing but the door. It holds for a module with no calls in it too. Four
 checks in this repo and the tooling around it have
 already passed by looking at nothing. `prose_check.py` reported clean on a repo path that
-did not exist. The day 3 gate approved a string of semicolons that parsed to zero
-statements. `depcheck.py` printed a total across zero repos. The day 4 validator found no
+did not exist. The parser gate approved a string of semicolons that parsed to zero
+statements. `depcheck.py` printed a total across zero repos. The catalog validator found no
 base tables in a query reading the host filesystem and reported no problem.
 
 ## Consequences

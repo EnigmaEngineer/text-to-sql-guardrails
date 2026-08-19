@@ -69,7 +69,7 @@ def check_bridge_join_without_is_primary_fans_out(ctx):
     A product reaches a category two ways. Through dim_product.category_id, and through
     bridge_product_category where roughly half the products carry a second non primary
     row. Both paths agree when is_primary is respected. Dropping that filter inflates
-    revenue and no error is raised, which is what makes it worth a static check on day 4.
+    revenue and no error is raised, which is what makes it worth a static check.
     """
     def total(join):
         return float(ctx.con.execute(

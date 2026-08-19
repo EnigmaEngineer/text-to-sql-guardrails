@@ -1,14 +1,14 @@
 """Static validation of generated SQL against the catalog the query will run on.
 
-Day 3 built a gate that asks DuckDB's parser whether a string is one read. That gate
+The gate built a gate that asks DuckDB's parser whether a string is one read. That gate
 approves this:
 
     SELECT * FROM read_csv('/etc/hostname')
     SELECT * FROM glob('/etc/*')
 
 Both are a single SELECT, so both serialize cleanly and both run. Measured on
-2026-08-10, `glob('/etc/*')` returned 95 rows and `read_text('/etc/hostname')` returned
-the contents of the file. The day 3 probe had already recorded that a read-only
+Measured, `glob('/etc/*')` returned 95 rows and `read_text('/etc/hostname')` returned
+the contents of the file. The role probe had already recorded that a read-only
 connection allows `read_csv` on a host path. The gate written the same day was never
 pointed at it, so the finding and the control never met.
 
@@ -16,8 +16,8 @@ The reason a table function slips through is worth stating, because it decides t
 of this module. A table function is not a BASE_TABLE in the parse tree. It is a
 TABLE_FUNCTION node. So a validator that walks the base tables and checks each one
 against the catalog finds nothing to check and reports no problem. That is a check
-passing on zero inputs, which is the third time this program has met that shape, after
-`prose_check.py` reporting clean on an empty file list and the day 3 gate approving a
+passing on zero inputs, which is the third time I have met that shape, after
+`prose_check.py` reporting clean on an empty file list and the parser gate approving a
 string of semicolons that parsed to zero statements.
 
 So `no_relation` is a finding here rather than a silence. A query the agent produces is
@@ -64,7 +64,7 @@ class Report:
         return tuple(f.code for f in self.findings)
 
     def as_dict(self):
-        """For the trace. Day 6 wants the reason, not a boolean."""
+        """For the trace. The correction loop wants the reason, not a boolean."""
         return {
             "ok": self.ok,
             "findings": [{"code": f.code, "detail": f.detail} for f in self.findings],
@@ -191,7 +191,7 @@ def _columns(shape, by_name, known_columns, findings):
                     # No CTE and no subquery, so there is nothing in this statement that
                     # could bind `zz` in `zz.date_key`. Skipping it was safe while the
                     # join rule counted real tables, because a condition naming an
-                    # unknown qualifier came out under two and was refused there. Day 7
+                    # unknown qualifier came out under two and was refused there. The scorecard
                     # made the join rule count qualifiers, which is right, and that made
                     # this skip reachable from a query the guard then approved and the
                     # cost layer crashed on. Reported as `unknown_table` rather than as a
@@ -235,7 +235,7 @@ def _columns(shape, by_name, known_columns, findings):
 def _join_sides(node, by_name):
     """Which relation names a join condition mentions, counting aliases separately.
 
-    This counted distinct real **tables** until day 7 and that refused every self join.
+    This counted distinct real **tables** until the scorecard and that refused every self join.
     `fct_order_header a JOIN fct_order_header b ON a.customer_id = b.customer_id AND
     a.order_id < b.order_id` is a repeat purchase question. Both aliases resolve to one
     table, so the old set had size one and the rule fired. No gold query self joins, so
@@ -249,7 +249,7 @@ def _join_sides(node, by_name):
     The first version of this fix kept a filter on `by_name`, so a qualifier belonging to
     a CTE or a derived table did not count as a side. A mutation pass removed the filter,
     survived, and the reason it survived is that the filter was a second false refusal of
-    exactly the ot-035 kind. `... FROM dim_customer c JOIN big b ON b.customer_id =
+    exactly this kind. `... FROM dim_customer c JOIN big b ON b.customer_id =
     c.customer_id` with `big` a CTE was refused, and it is ordinary SQL that runs and
     returns rows. No gold query joins a CTE, so the answer key check stayed green through
     that too. Every qualifier counts now. A qualifier naming nothing real is somebody
@@ -270,7 +270,7 @@ def _joins(shape, by_name, findings):
         if ref_type == "CROSS":
             # Both `a, b` and an explicit CROSS JOIN land here. Neither carries a
             # condition. The detail is what keeps them apart from a join that lost its
-            # ON clause, and day 6 needs that difference to tell a model what to change.
+            # ON clause, and the correction loop needs that difference to tell a model what to change.
             # The tests assert the detail rather than the code. A mutant that deleted
             # this branch survived a test that only read the code.
             findings.append(

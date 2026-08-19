@@ -1,7 +1,7 @@
 """The read-only role, and the gate that has to sit in front of it.
 
 Opening the connection with `read_only=True` is the obvious move and it is not enough.
-Measured on 2026-08-09 against duckdb 1.5.5 by `scripts/role_probe.py`, a read-only
+Measured against duckdb 1.5.5 by `scripts/role_probe.py`, a read-only
 connection still allows all of these:
 
     COPY (SELECT ...) TO '/tmp/x.csv'   wrote 4,000 customer emails to disk
@@ -26,7 +26,7 @@ because either one alone has a hole the other covers.
 The gate is DuckDB's own parser rather than a regex. `json_serialize_sql` refuses
 anything that is not a SELECT, with `error_type` "not implemented", and it splits a
 string into statements the way the engine will. A semicolon inside a string literal does
-not split. That is the day 2 reasoning about `information_schema` arriving somewhere new.
+not split. That is the `information_schema` reasoning arriving somewhere new.
 Ask the engine what the query is, do not guess from the text.
 """
 
@@ -55,7 +55,7 @@ class Decision:
     node_types: tuple = field(default_factory=tuple)
 
     def as_dict(self):
-        """For the trace. Day 6 wants every decision the agent made, not just the last."""
+        """For the trace. The correction loop wants every decision the agent made, not just the last."""
         return {
             "allowed": self.allowed,
             "reason": self.reason,
@@ -75,7 +75,7 @@ def connect(db_path):
 def inspect(con, sql):
     """Decide whether `sql` is a single read that the agent is allowed to run.
 
-    Four ways to be refused, and they are kept apart because day 6 has to tell a model
+    Four ways to be refused, and they are kept apart because the correction loop has to tell a model
     what it did wrong. "Your query was rejected" does not help it self correct.
     """
     if sql is None or not sql.strip():
@@ -111,7 +111,7 @@ def inspect(con, sql):
     return Decision(True, "single_read", "", 1, node_types)
 
 
-# There used to be a `run` here that gated and then executed. It was removed on day 4.
+# There used to be a `run` here that gated and then executed. It was removed.
 # It was a second way into the database that knew about the parser and not about the
 # catalog, so `agent.validate` would have had to be added in two places and one of them
 # would eventually have been missed. `agent.guard.execute` is the only door now.

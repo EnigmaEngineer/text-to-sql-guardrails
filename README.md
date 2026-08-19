@@ -4,14 +4,14 @@ Ask a question in English, get SQL and have the agent refuse the query before it
 it is unsafe or too expensive. The guardrails are the product. The generation is the easy
 part.
 
-Day 7 of 7, complete. The agent runs end to end against a scripted generator, because no
-model is reachable from the environment this is built in.
+The agent runs end to end against a scripted generator, because no model is reachable from
+the environment this is built in.
 
 **There is no accuracy number in this repo and there cannot be one.** Accuracy on a text
 to SQL set is a property of the thing writing the SQL, and nothing here has ever called a
-model. So day 7 scores the guard instead. Scored on all 30 frozen questions the guard gets
-27, and a system with no guardrails at all gets 22. That gap is what six days of work
-bought. `docs/adr-0011` is the whole argument.
+model. So the guard is what gets scored instead. Across all 30 frozen questions the guard
+gets 27, and a system with no guardrails at all gets 22. That gap of five questions is what
+every layer in here is worth put together. `docs/adr-0011` is the whole argument.
 
 ```
 python3 scripts/build_warehouse.py   --db /tmp/wh.duckdb
@@ -70,7 +70,7 @@ scripts/scorecard_report.py  every question, the floor, and what each layer is w
 docs/adr-00*.md          eleven decisions, with what each one costs
 ```
 
-## Measured on 2026-08-07
+## The warehouse, measured
 
 Every figure below came out of a command run that day. Rebuild them with the three
 commands above.
@@ -99,10 +99,10 @@ Timings are from one machine on one day. The ratios survive, the milliseconds do
 
 | expected refusal | count | which guardrail should catch it |
 |---|---|---|
-| write_operation | 3 | read-only role, day 3 |
-| unbounded_scan | 2 | cost ceiling, day 5, and it does not catch them |
+| write_operation | 3 | the read-only role and the gate |
+| unbounded_scan | 2 | the cost ceiling, and it does not catch them |
 | pii_export | 2 | nothing yet |
-| not_in_schema | 1 | static validation, day 4 |
+| not_in_schema | 1 | static validation |
 
 Two of those eight are a policy call about personal data and the plan for this project
 names no policy layer. They may go unanswered at the end of the week. They stay in.
@@ -110,7 +110,7 @@ names no policy layer. They may go unanswered at the end of the week. They stay 
 The set is frozen. `evals/FROZEN.json` holds a sha256 taken before any generation code
 existed and the test suite fails if the questions file moves.
 
-## What day 1 got wrong
+## What the eval set got wrong before I froze it
 
 Two things, both caught before the freeze and before the commit.
 
@@ -132,11 +132,11 @@ A fourth was a label. `power.describe` printed the number 30 next to the word sc
 while only 22 of the questions are scored against a gold answer. Both counts are real and
 they mean different things, so it now prints both.
 
-## Day 2, measured on 2026-08-08
+## Schema retrieval, and whether this warehouse needs it
 
 Retrieval is meant to keep the prompt small on a wide warehouse. This warehouse is not
-wide. The whole schema is 2,716 characters. So day 2 measured the layer instead of
-assuming it.
+wide. The whole schema is 2,716 characters. So I measured the layer instead of assuming
+it.
 
 Relevance is not hand labelled. A table is relevant to a question when the frozen gold SQL
 for that question reads from it, and the tables are pulled out of DuckDB's own parse tree
@@ -156,8 +156,8 @@ rather than a score.
 | dense + join | 8 | 20 of 22 | 0.952 | 2,288 |
 | send everything | n/a | 22 of 22 | 1.000 | 2,716 |
 
-The suite is 60 checks after today, up from 38. Every figure in this section came out of
-`scripts/retrieval_report.py` on 2026-08-08, run from this repo rather than from the
+The suite is 60 checks at this point, up from 38. Every figure in this section came out of
+`scripts/retrieval_report.py`, run from this repo rather than from the
 scratch copy it was written in.
 
 ![retrieval cost against completeness](docs/retrieval_cost.png)
@@ -170,7 +170,7 @@ Every pairwise comparison at k=8 is underpowered and the report says so on the l
 it prints the number. The largest gap moves three questions, and this set needs six
 disagreements before p below 0.05 is reachable at any effect size.
 
-## What day 2 got wrong
+## The retrieval result a four word change reversed
 
 **A one line change to the baseline destroyed the headline result.**
 
@@ -209,7 +209,7 @@ so the naming convention every other join follows breaks on the one dimension th
 needed most. Text scoring cannot see it and the inferred join graph gives it zero edges.
 The inferred edges cover 9 of the 16 table pairs the gold queries put together.
 
-## Mutation, day 2
+### Mutation over the retrieval modules
 
 14 mutants over the new modules, 13 killed. The survivor renames a local variable and is
 the control.
@@ -218,7 +218,7 @@ The ones worth naming. Keeping CTE names as tables. Counting a partial hit as co
 Breaking ties by catalog order rather than by name. A one sided permutation test. Flipping
 the ties along with the differences. Dropping the plural stripper.
 
-## Day 3, measured on 2026-08-09
+## The read-only role, and what it does not protect
 
 Every figure below was produced by a script in this repo on that date. The commands are
 named beside them so they can be re-run rather than trusted.
@@ -258,21 +258,21 @@ anything built so far.
 
 | reason | questions | status | needs |
 |---|---|---|---|
-| write_operation | 3 | covered | day 3, the gate |
-| not_in_schema | 1 | open | day 4, static validation |
-| unbounded_scan | 2 | open | day 5, the cost ceiling |
+| write_operation | 3 | covered | the gate |
+| not_in_schema | 1 | open | static validation |
+| unbounded_scan | 2 | open | the cost ceiling |
 | pii_export | 2 | open | nothing designed yet |
 
 The three covered ones were run through the pipeline with the obvious write SQL for each
 and all three came back refused. That SQL was written by hand, so it demonstrates the gate
 and does not measure a model.
 
-**There is no accuracy number here and there will not be one until day 7.** No language
+**There is no accuracy number here and there never will be.** No language
 model is reachable from the environment this repo is built in. Generation runs through
 `ScriptedGenerator`, which replays the frozen gold SQL. The 22 of 22 that
 `generation_report.py` prints is a statement about the plumbing and about nothing else.
 
-## What day 3 got wrong
+## The probe that reported protections it never tested
 
 **The role probe reported three protections that had not been tested.** The first version
 had INSERT, UPDATE and COPY coming back refused, and the reason in each case was a binder
@@ -302,19 +302,19 @@ reading the file before running it.
 `EXPORT DATABASE` writes a directory, so the row that dumps the entire warehouse showed as
 having left nothing behind.
 
-## Mutation, day 3
+### Mutation over the gate
 
 14 mutants over the new modules, 13 killed. The survivor renames a local variable and is
 the control.
 
 The ones worth naming. Dropping the zero statement check. Dropping the multiple statement
 check. Collapsing `unparseable` into `not_a_read`. Reverting the question splitter to the
-bare marker, which is today's bug turned into a regression test. Testing the refusal token
+bare marker, which is that bug turned into a regression test. Testing the refusal token
 by substring instead of equality. Reporting a gate refusal as an execution failure.
 
-## Day 4, measured on 2026-08-10
+## Static validation against the catalog
 
-Static validation against the catalog, plus the injection check the blueprint asks for.
+Static validation against the catalog, plus the injection check the plan asks for.
 Rebuild every number below with:
 
 ```
@@ -324,7 +324,7 @@ python3 scripts/validation_report.py  --db /tmp/wh.duckdb --json /tmp/v.json
 python3 scripts/validation_chart.py   --json /tmp/v.json
 ```
 
-**The day 3 gate approves a query that reads the host filesystem.** It is a single SELECT,
+**The gate approves a query that reads the host filesystem.** It is a single SELECT,
 so it serializes, so the gate says yes and the read-only connection runs it.
 
 ```
@@ -332,12 +332,12 @@ list the filesystem     gate allows   ran, 95 rows, first cell '/etc/.pwd.lock'
 read a host file as text gate allows  ran, 1 rows, first cell '/etc/hostname'
 ```
 
-The day 3 probe had already recorded that `read_csv` on a path works on a read-only
+The role probe had already recorded that `read_csv` on a path works on a read-only
 connection. The gate written the same day was never pointed at it.
 
 ![what each layer catches](docs/gate_vs_validation.png)
 
-Over 17 probe queries, the day 3 gate alone approves 14. Static validation refuses 12 of
+Over 17 probe queries, the gate alone approves 14. Static validation refuses 12 of
 those 14. The two it lets through are correct queries and it should.
 
 **The obvious validator would not have caught the worst one.** A table function is not a
@@ -360,11 +360,11 @@ the warehouse is refused, `SELECT 42` included.
 | `unparseable` | it will not parse, reported rather than raised |
 
 **Cost.** `guard.approve` over the 22 gold queries is 12.89 ms, which is 49.3 percent of
-the 26.17 ms it takes to run the same 22. That is the day 4 shape, gate and validate with
+the 26.17 ms it takes to run the same 22. That is gate and validate with
 no ceiling passed.
 
 The number above described this layer correctly on 08-10 and stopped describing real use
-on 08-11, when day 5 put `EXPLAIN` inside the same function. The pipeline always passes a
+when the cost layer put `EXPLAIN` inside the same function. The pipeline always passes a
 ceiling, and with the cost layer in, approval is 25.43 ms and 97.2 percent of execute.
 Approving a query now costs about what running it costs. The original sentence here
 concluded that approval cost stops mattering, and that conclusion did not survive the
@@ -377,13 +377,14 @@ move with the machine by up to 1.8x. The ratio is the part that travels.
 **Refusal coverage on the frozen eval set is 4 of 8, up from 3.** `q030` asks for a churn
 score the warehouse does not hold and is now refused as `unknown_column`. `q029` is also
 refused, by the cross join rule, and it is labelled `unbounded_scan`. Counting that as
-cost coverage would be claiming a day 5 result on day 4. `q028` is the same category with
+cost coverage would be claiming the cost layer's result for validation. `q028` is the same
+category with
 no cross join in it and nothing built so far touches it.
 
-> Read this as the matching reading. Day 6 found that the repo had been quoting one of two
+> Read this as the matching reading. The repo had been quoting one of two
 > numbers without saying which. Five of the eight are refused by something and four are
-> refused by the layer their label points at. Day 7 computes both from `scorecard.OWNER`
-> rather than by subtracting one. See the day 7 section.
+> refused by the layer their label points at. Both are computed from `scorecard.OWNER`
+> now, rather than by subtracting one. See the scorecard section.
 
 **One door.** `agent/guard.py` composes gate then validation and is the only path from
 generated SQL to the connection. `role.run` was deleted rather than left as a second door.
@@ -407,7 +408,7 @@ Half of those fixtures exist for the opposite case, which is a detector handed n
 look at. There is a directory with no python in it, one holding nothing but the door, and
 a module that makes no calls at all. Each must raise rather than report clean. Four checks
 in this repo and its tooling have already passed by looking at nothing, most recently the
-day 4 validator, which found no base tables in a query that read the host filesystem and
+validator, which found no base tables in a query that read the host filesystem and
 reported no problem.
 
 Two things fell out of building it. A mutation run showed the string half of "must be a
@@ -415,7 +416,7 @@ string literal" was carrying no weight, because no fixture passed a constant tha
 a string. And the report was sorted as text, so a defect on line 23 was listed above one
 on line 9. Both are fixed and both are now pinned by a fixture.
 
-## What day 4 got wrong
+## The rule that refused a quarter of the answer key
 
 **The first column rule refused 6 of the 22 gold queries.** All six the same way:
 
@@ -446,7 +447,7 @@ mutant that executed a refused verdict wrote them to the fixed path a test asser
 absent. Every mutant after it looked killed, including the control, which is the one that
 must survive for the run to mean anything. The test uses a unique temporary directory now.
 
-## Mutation, day 4
+### Mutation over validation
 
 17 mutants, 15 killed. The two survivors are the control, which rewords a comment, and one
 that removes the string literal check from the one door test. Nothing tests a test, so
@@ -462,7 +463,7 @@ the `no_relation` finding. Accepting every bare column. Treating output aliases 
 names. Reporting `ok` regardless of findings. Executing a refused verdict. Skipping the
 gate refusal branch so validation ran first.
 
-## Day 5, measured on 2026-08-11
+## The cost ceiling, read off EXPLAIN
 
 A cost estimate from `EXPLAIN`, and a ceiling that refuses a query before it runs.
 Rebuild every number below with:
@@ -471,7 +472,7 @@ Rebuild every number below with:
 python3 scripts/build_warehouse.py --db /tmp/wh.duckdb
 python3 -m tests.run_all           --db /tmp/wh.duckdb
 python3 scripts/cost_report.py     --db /tmp/wh.duckdb --json /tmp/c.json
-python3 scripts/cost_chart.py      --db /tmp/wh.duckdb --out docs/day5_cost_metric.png
+python3 scripts/cost_chart.py      --db /tmp/wh.duckdb --out docs/cost_metric.png
 ```
 
 **The obvious metric does not work and the second obvious one does not either.** Rows
@@ -487,7 +488,8 @@ So the ceiling reads work done. Which of two ways is a measurement, not a prefer
 | largest estimate on any node | 64,357 | 223,844,302 | 3,478x |
 
 The inequality join is `fct_order_line JOIN fct_web_session ON l.quantity > s.page_views`.
-Its condition names two real tables, so day 4 approves it. Summing the scans puts it 1.48x
+Its condition names two real tables, so validation approves it. Summing the scans puts it
+1.48x
 above the answer key, which is not a gap anything can sit in. The largest single step puts
 it 3,478x above. Same plan, same walk, two numbers.
 
@@ -496,34 +498,35 @@ comes off the warehouse rather than out of the eval set on purpose. No question 
 types should make the engine handle more rows than the warehouse holds. It lands at 3.2x
 the answer key worst case, which is headroom rather than calibration.
 
-![the metric choice, and the estimate against reality](docs/day5_cost_metric.png)
+![the metric choice, and the estimate against reality](docs/cost_metric.png)
 
 **The estimate is not an upper bound.** Against DuckDB's own profiler it came in below
 what the query really scanned on 8 of the 22 gold queries, worst at 0.23 of actual. This
 layer refuses accidents. It is not a defence against someone trying.
 
 **It buys no coverage on the eval set, and that is the honest headline.** Two questions
-are tagged `unbounded_scan`. q029 was already refused by the day 4 cross join rule. q028
+are tagged `unbounded_scan`. q029 was already refused by the cross join rule in validation.
+q028
 asks for every row of `fct_web_session` and estimates at 40,000. q009 is a real question
 that reads the same table with no filter and estimates at 40,000 too. The plans cost the
 same. No ceiling separates them, because what makes q028 unreasonable is the size of the
 answer and that is the number the plan will not give. Refusal coverage stays at 4 of 8.
 
-| after day 5 | refusal coverage |
+| with the cost layer | refusal coverage |
 |---|---|
 | write_operation | 3 of 3, gate |
 | not_in_schema | 1 of 1, validation |
-| unbounded_scan | 0 of 2 by cost, 1 of 2 counting the day 4 cross join rule |
+| unbounded_scan | 0 of 2 by cost, 1 of 2 counting the cross join rule |
 | pii_export | 0 of 2, still nothing |
 
-`docs/adr-0009` records the decision and both of the wrong turns below. Day 7 took the
+`docs/adr-0009` records the decision and both of the wrong turns below. I later took the
 layer out entirely and scored the set again. The pooled figure does not move by a single
 question, which is what this paragraph said in words and could not say as a number.
 
-## What day 5 got wrong
+## Three cost rules that met inputs the answer key does not contain
 
-Three times today a rule looked correct until it met an input the answer key does not
-contain. That is the same mistake day 4 made with the output alias and it arrived in three
+Three times a rule looked correct until it met an input the answer key does not
+contain. That is the same mistake the output alias rule made and it arrived in three
 new costumes.
 
 **The unscored operator list was written from memory and both halves were wrong.** It
@@ -541,7 +544,7 @@ from metadata and never touches the table. No gold question is a bare count on o
 so the answer key check stayed green while this was live. The rule now refuses a plan where
 no node carries a number, which is a different question from whether a table was read.
 
-**The day 4 structural check refused this day's first draft, correctly.** The ceiling was
+**The structural check refused my first draft of this, correctly.** The ceiling was
 first computed by building a `count(*)` per table with string formatting, which is a
 non literal `.execute()` outside `agent/guard.py`. The suite went red on two checks. The
 fix was not an exemption. `duckdb_tables()` gives the same total in one literal statement,
@@ -554,10 +557,10 @@ became wrong the moment a cost refusal could follow a clean validation. A query 
 cost was reporting validation as failed. Caught by a check that reads the steps rather than
 the outcome.
 
-## Day 4 has a false positive it does not know about
+## A validation rule with a false positive it does not know about
 
-Not fixed today, because it is a day 4 rule and the fix is a design question rather than a
-patch. `unrelated_join` refuses any join whose condition touches fewer than two distinct
+Left alone when I found it, because it belongs to the validation layer and the fix is a
+design question rather than a patch. `unrelated_join` refuses any join whose condition touches fewer than two distinct
 tables. A self join always resolves both aliases to one table, so every self join is
 refused, including this one:
 
@@ -567,13 +570,13 @@ JOIN retail.fct_order_header b ON a.customer_id = b.customer_id AND a.order_id <
 ```
 
 That is a repeat purchase question and it is legitimate. No gold query self joins, which is
-why day 4 shipped without seeing it. Same shape as everything above.
+why validation shipped without seeing it. Same shape as everything above.
 
-> Fixed on day 7. The rule counts qualifiers rather than tables now. A second false
+> Fixed later. The rule counts qualifiers rather than tables now. A second false
 > refusal of the same kind was found in the fix itself by a surviving mutant. See the day
 > 7 section.
 
-## Mutation, day 5
+### Mutation over the cost layer
 
 15 mutants over `agent/cost.py`, the cost branches of `agent/guard.py` and the new step in
 `agent/pipeline.py`. 13 killed on the first pass. One survivor was the control. The other
@@ -584,7 +587,7 @@ the whole suite stayed green. The branch is unreachable through the real path, b
 validation refuses a query that reads no table before cost ever sees one. It is still right
 to have, since without it `read_plan` raises out of a `guard.execute` documented never to
 raise. So it got a test that stubs the plan rather than a deletion. That is the opposite
-call from the day 4 survivor, which was an unreachable branch that really should have gone.
+call from the earlier survivor, which was an unreachable branch that really should have gone.
 
 Named ones that were killed. Reading the scan sum instead of the largest step. Moving the
 ceiling comparison off by one. Deleting the unscored operator rule. Adding `CROSS_PRODUCT`
@@ -594,9 +597,9 @@ the schema. Running cost before validation. Skipping cost whenever a ceiling was
 Dropping the ceiling on the way through `guard.execute`. Reporting the validate step with
 the final verdict.
 
-## Day 6, measured on 2026-08-12
+## The self correction loop
 
-Day 6 of the plan is the self correction loop, capped at two retries, and trace capture.
+The self correction loop is capped at two retries, with trace capture around it.
 `agent/pipeline.solve` runs the loop and calls `agent/pipeline.answer` and nothing else,
 so every attempt goes through the same one door as a single attempt does.
 
@@ -638,9 +641,9 @@ of fourteen.
 `scripts/trace_report.py` over the 22 answerable questions. Median of seven repeats after
 a discarded warmup. 70.3 ms against 102.6 ms, spread 66.4 to 73.5 and 98.9 to 106.4, a
 ratio of 1.46. A refused attempt is judged and never executed, which is where the missing
-1.5x went. The ratio read 1.46, 1.49 and 1.51 across three passes today and the
-milliseconds moved more than that, because the sandbox varies by roughly 1.8x between
-days. Only the ratio travels.
+1.5x went. The ratio read 1.46, 1.49 and 1.51 across three passes. The milliseconds moved
+more than that, because this box varies by roughly 1.8x session to session. Only the ratio
+travels.
 
 **The loop stops on a repeat and not only at the cap.** The cap bounds the damage. It does
 not stop a generator that ignores the correction, and a generator that ignores the
@@ -650,7 +653,7 @@ layer. Four endings are recorded and kept apart: `resolved`, `stopped_unretryabl
 
 **The trace renders as text, not as a Streamlit app.** The plan names Streamlit. There is
 no browser in the environment this repo is built in, and a component that has never run is
-worse than an absent one. `docs/adr-0010` records that with the rest of the day.
+worse than an absent one. `docs/adr-0010` records the reasoning.
 
 ```
 attempt 1 of 3
@@ -671,9 +674,9 @@ attempt 2 of 3
 ending   resolved after 1 retry(s)
 ```
 
-![the correction policy and what reaches it](docs/day6_policy.png)
+![the correction policy and what reaches it](docs/correction_policy.png)
 
-## What day 6 got wrong
+## The report that announced coverage this project does not have
 
 **A report announced PII coverage this project does not have, on the strength of a typo.**
 `evals/reach.py` runs a hand written plausible query for each of the eight refuse-tagged
@@ -697,34 +700,34 @@ wrong.
 
 **The refusal coverage figure depends on an unstated convention.** The repo has been
 quoting 4 of 8. Five of the eight are refused by something. The difference is q029, which
-is labelled `unbounded_scan` and is stopped by the day 4 cross join rule, so the reading
+is labelled `unbounded_scan` and is stopped by the cross join rule in validation, so the reading
 that counts a question as covered only when the layer matching its label catches it gives
 4 and the reading that counts any refusal gives 5. Both are now printed side by side, with
 the reason, so the number cannot be quoted without the convention attached.
 
-## Mutation, day 6
+### Mutation over the correction loop
 
-Thirty mutants in two rounds, over the six modules day 6 touched. The first round of
+Thirty mutants in two rounds, over the six modules this loop touches. The first round of
 seventeen killed all seventeen. That was too clean to believe, so a second round of
 thirteen was aimed at code the first had not touched. Six survived it and none was an
 unreachable branch.
 
-Two of the six were the day 5 shape, which is a branch contributing nothing today that
-must stay anyway. Both got a stubbed test rather than a deletion. One is the loop running
+Two of the six were the shape the cost layer threw up, which is a branch contributing
+nothing right now that must stay anyway. Both got a stubbed test rather than a deletion. One is the loop running
 the answer key through the guard. It fires only when a guardrail starts refusing correct
 queries. The other is the second entry in `NAME_ERROR_CODES`, which nothing currently
 trips. After the six fixes both rounds kill everything.
 
-## Day 7, measured on 2026-08-13
+## The scorecard, and the floor underneath it
 
-The plan for today says "README with accuracy numbers on the eval set". There is no model
+The plan says "README with accuracy numbers on the eval set". There is no model
 here, so there is no accuracy number, and `scripts/scorecard_report.py` opens by saying so
 rather than leaving a gap that gets filled in later by someone in a hurry. What it prints
 instead is the guard scored against all 30 frozen questions.
 
 ```
 python3 scripts/scorecard_report.py --db /tmp/wh.duckdb --json /tmp/s.json
-python3 scripts/scorecard_chart.py  --db /tmp/wh.duckdb --out docs/day7_scorecard.png
+python3 scripts/scorecard_chart.py  --db /tmp/wh.duckdb --out docs/scorecard.png
 python3 -m tests.run_all            17 modules, 243 checks, 243 passed
 ```
 
@@ -743,7 +746,7 @@ above. Six days of guardrails moved the number by 5 questions.
 
 **The two halves are not the same kind of evidence.** The 22 answerable questions are run
 as their gold SQL, and that half is in sample by construction. Three checks fail the build
-if any layer refuses a gold query, and day 4's first column rule refused six of them and
+if any layer refuses a gold query, and the first column rule refused six of them and
 was rewritten. So the 22 record a green test rather than a measurement. The 8 refuse
 questions are run as hand written plausible SQL and they are the only part that could have
 gone badly.
@@ -755,7 +758,7 @@ gone badly.
 | exact one sided 95 % lower bound on 5 of 8 | 0.289 |
 
 Eight observations do not support a percentage. The bound is what the count licenses, and
-it is the same Clopper Pearson convention used on the earlier project in this program, so
+it is the same Clopper Pearson convention used on an earlier project of mine, so
 the two are comparable. `check_the_lower_bound_reproduces_two_figures_from_an_earlier_project`
 pins it against two values computed independently in July.
 
@@ -773,8 +776,8 @@ this and for nothing else. An empty set raises rather than approving, and a chec
 | validate only | 27 | 5 of 8 | 1 of 8 | 0 |
 | cost only | 23 | 1 of 8 | 1 of 8 | 4 |
 
-**Removing the cost layer changes nothing.** A whole day of work and the frozen set cannot
-see it. Day 5 said that in words. This is the number, and
+**Removing the cost layer changes nothing.** All that work, and the frozen set cannot
+see it. The cost section says that in words. This is the number, and
 `check_taking_the_cost_layer_away_changes_nothing_on_this_set` fails the suite if it ever
 stops being true, which would mean this paragraph needs rewriting.
 
@@ -787,20 +790,21 @@ single number would have concluded the gate was redundant.
 
 **The cost layer alone raises on four questions rather than refusing them.** `EXPLAIN` on
 a `DELETE` over a read-only connection is an `InvalidInputException` and `EXPLAIN` on an
-unknown column is a `BinderException`, and neither is caught. Day 5 put cost last because
+unknown column is a `BinderException`, and neither is caught. Cost runs last because
 `EXPLAIN` binds and binding a table function opens what it points at. This is the cruder
 second reason. Run first it does not refuse, it explodes. A raised exception is counted
 wrong on both halves throughout, because an ablation that scored a crash as coverage would
 report the layer it just removed as unnecessary.
 
-![the scorecard and the layer ablation](docs/day7_scorecard.png)
+![the scorecard and the layer ablation](docs/scorecard.png)
 
-## What day 7 got wrong
+## The reading that was arithmetic rather than a definition
 
-**Day 6 printed the matching reading as `refused_by_something - 1`.** It was correct on
+**The matching reading used to be printed as `refused_by_something - 1`.** It was correct
+on
 the day and it was arithmetic rather than a definition. `scorecard.OWNER` is the
 definition now, and `check_the_matching_reading_is_not_refused_minus_one` uses a fixture
-where the gap is two, so anything subtracting one fails. This is the `ot-037` class from
+where the gap is two, so anything subtracting one fails. This is the same class as
 the day before, which is a published figure with nothing producing it.
 
 **The `layers` argument is a way to turn the guard down.** Adding one on the last day, to
@@ -812,17 +816,18 @@ unknown layer name raises, and nothing in `agent/` may pass it. The cost is stat
 **The check that the cost layer changes nothing passed whether or not the layer ran.** A
 mutant making `layers` ignore its cost entry survived the suite, because the arm with the
 layer and the arm without it score the same either way and that is the finding the check
-was written about. It needed a query the cost layer does refuse, which is the day 5
+was written about. It needed a query the cost layer does refuse, which is the
 inequality join. That is a ninth distinct way something has passed here while being wrong,
 and it is the first where the reason was the result being reported.
 
 **The first fix for the self join defect had the same defect in it.** See below.
 
-## Two false refusals closed on day 7
+## Two false refusals, closed
 
 `unrelated_join` refuses a join whose condition does not relate the two sides. It counted
 distinct real **tables**, so every self join was refused, because both aliases resolve to
-one table. That is `ot-035`, found on day 5 and left alone because the fix is a design
+one table. I found that while building the cost layer and left it alone because the
+fix is a design
 question rather than a patch. The unit is the qualifier and not the table, since what the
 rule is asking is whether the condition relates two relations.
 
@@ -849,12 +854,12 @@ JOIN big b ON b.customer_id = c.customer_id ORDER BY b.n DESC LIMIT 5
 
 No gold query self joins and no gold query joins a CTE, so the answer key check stayed
 green through both. That is the third and fourth time a rule here has looked correct until
-it met a shape the answer key does not contain, after the day 4 output alias and the day 5
+it met a shape the answer key does not contain, after the output alias and the
 bare count. Running a guardrail over the answer key is necessary and it is not sufficient.
 Both fixes were reverted in a scratch copy and the new checks confirmed failing before
 they were committed.
 
-## Mutation, day 7
+### Mutation over the scorecard
 
 Twenty two mutants over `evals/scorecard.py`, the `layers` argument in `agent/guard.py`
 and the join rule in `agent/validate.py`. The first round of twenty killed eighteen. Both
@@ -871,16 +876,17 @@ backend that refuses. Nothing here says anything about how well a model writes S
 **Nothing stops a PII read.** `SELECT customer_email FROM retail.dim_customer` is a single
 read over a real table and a real column, so it passes the gate and it passes static
 validation too. It is what question q026 asks for. A column level policy is the obvious
-answer and it is on no day of the plan. Day 4 made this gap narrower and not smaller.
+answer and nothing in the plan asked for it. Validation made this gap narrower and not
+smaller.
 
 **Static validation checks names and not types.** `CAST(customer_email AS INTEGER)` is
 approved by both layers and fails at execution. That outcome is reported as `failed`
-rather than `refused`, and day 6 sends a different correction back for each.
+rather than `refused`, and the correction loop sends a different message back for each.
 
 **Eleven of the fourteen correction strategies have never met a real input.** They are
 reachable, so this is not dead code. It is eleven untested decisions about what to tell a
 model, and nothing in the eval set exercises any of them. Widening the eval set is the
-honest fix and day 7 does not have room for it.
+honest fix and I did not have room for it.
 
 **The corrections have never been read by a model.** `SequenceGenerator` answers from a
 list and ignores what it is told. So the loop, the trace and the four stopping rules are
@@ -905,7 +911,7 @@ underestimates walks under the ceiling. This stops accidents.
 **Nothing caps the size of the answer.** The plan will not estimate rows returned, so
 `SELECT * FROM retail.fct_web_session` passes every layer. A `LIMIT` injected on approved
 SQL is the obvious answer and it is a change to the query rather than a judgement about it,
-which is a different kind of act and belongs behind a decision rather than in a day 5
+which is a different kind of act and belongs behind a decision rather than inside a
 commit.
 
 **The Snowflake path has never run.** `adapter.snowflake()` carries `verified = False` and
@@ -914,7 +920,7 @@ against DuckDB's plan document and Snowflake returns a different one, so the cos
 not port either.
 
 **Retrieval loses on this warehouse and it is shipped anyway.** Measured, not argued. See
-`docs/adr-0005`. It is kept because the guardrails on days 3 to 6 need a table set to
+`docs/adr-0005`. It is kept because the guardrails downstream need a table set to
 validate against and because a wide warehouse is the case this project is written for. It
 is off by default.
 
@@ -957,7 +963,8 @@ the gold queries touch the order tables. Five exclude cancelled orders and nine 
 There is no stated rule, so a system has no way to infer which questions want the filter.
 Some of the nine are defensible, because an order placed and then cancelled was still
 placed. `q005`, the average order total by channel, is a judgement call and the eval takes
-one side without saying so. Day 7 reports per question rather than hiding this in a single
+one side without saying so. The scorecard reports per question rather than hiding this in a
+single
 accuracy figure.
 
 **The generator is not the real world.** Order status is drawn from a fixed list, so the
@@ -984,8 +991,8 @@ attached to a query, and nothing in the plan earned one. `docs/adr-0006` has the
 `retrieval/graph.py` infers edges from column naming. It breaks on `dim_date`, whose key is
 `date_key` while the fact tables carry `order_date_key`. Six scored questions need that
 table and not one contains the word date, so no scorer reaches it either. Adding the
-constraints is a day 1 change and it rebuilds the warehouse, which changes the gold answers
-that every number since day 1 rests on. The freeze hash covers the questions and not the
+constraints means rebuilding the warehouse, which changes the gold answers that every
+number in this file rests on. The freeze hash covers the questions and not the
 schema, so it is permitted and it is still the wrong week to do it. It is the first thing a
 second week does, together with a re-verification of all 22 gold fingerprints.
 
@@ -1006,15 +1013,15 @@ already an unfrozen probe set in miniature and growing it is the shape of the an
 a day of work and it belongs to whichever project needs those codes to be real.
 
 **The self join defect.** This one was built, on the last day, and it turned out to hide a
-second defect of the same kind. See the day 7 section.
+second defect of the same kind. See the scorecard section.
 
 ## Mutation
 
-The test suite is checked by breaking things on purpose. Day 1 ran 12 mutants and killed
-11. Day 2 ran 14 more over the new modules and killed 13. Day 3 ran 14 more and killed 13.
-Day 4 ran 17 and killed 15, then 14 more over the structural detector and killed 13. Day 5
-ran 15 and killed 14. Day 6 ran 30 over two rounds and killed all of them after six fixes.
-Day 7 ran 20 and killed 18, then 22 and killed all 22.
+The test suite is checked by breaking things on purpose, one round per layer as it landed.
+The warehouse and eval set, 12 mutants and 11 killed. Retrieval, 14 and 13. The gate, 14 and
+13. Validation, 17 and 15, then 14 more over the structural detector and 13 killed. Cost, 15
+and 14. The correction loop, 30 over two rounds and all of them killed after six fixes. The
+scorecard, 20 and 18, then 22 and all 22.
 
 Every survivor across the week was either a deliberate control, an unreachable branch that
 was kept for a stated reason, or a real gap that became a test. Two of them were live

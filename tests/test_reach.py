@@ -1,6 +1,6 @@
 """Checks on the reach measurement, including the control that caught the day's mistake.
 
-`evals/reach.py` produces the number day 6 leads with, so it gets tests rather than a
+`evals/reach.py` produces the number the correction loop leads with, so it gets tests rather than a
 report script and a hope. The two that matter are the suspect rule and the one asserting
 that the hand written queries name only real objects. Either would have caught the typo
 that made the report announce PII coverage this project does not have.
@@ -107,7 +107,7 @@ def check_an_approved_query_is_counted_as_still_running():
 def check_the_real_measurement_still_says_pii_runs(ctx):
     """The finding this file exists to protect, asserted against the live guard.
 
-    `ot-032` says nothing in this project stops a query reading PII. If a later change
+    Nothing in this project stops a query reading PII. If a later change
     makes that false, this check fails and somebody has to decide whether the thread
     closed or whether a rule got quietly widened.
     """
@@ -117,8 +117,8 @@ def check_the_real_measurement_still_says_pii_runs(ctx):
     measured = reach.measure(ctx.con, tables, rows, ceiling, guard.approve)
     eq(measured.suspect, [], "no suspect refusals in the real run")
     for qid in ("q026", "q027"):
-        true(qid in measured.approved, "%s should still run, see ot-032" % qid)
-    true("q028" in measured.approved, "q028 should still run, see the day 5 finding")
+        true(qid in measured.approved, "%s should still run, PII is not gated" % qid)
+    true("q028" in measured.approved, "q028 should still run, see the cost finding")
 
 
 def check_a_refused_gold_query_is_recorded():
@@ -127,7 +127,7 @@ def check_a_refused_gold_query_is_recorded():
     A mutant that deleted it survived, because all 22 gold queries validate clean, so
     removing the loop changes no output. It is not unreachable. It fires the moment a
     guardrail starts refusing the answer key, which is the worst regression this repo
-    can have and the one thing a coverage report must never hide. Same call as the day 5
+    can have and the one thing a coverage report must never hide. Same call as the cost
     `no_estimate` branch, tested with a stub rather than deleted.
     """
     rows = [

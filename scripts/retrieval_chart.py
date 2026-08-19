@@ -1,4 +1,4 @@
-"""Draw the day 2 result. Reads the report's json, computes nothing of its own.
+"""Draw the retrieval result. Reads the report's json, computes nothing of its own.
 
     python3 scripts/retrieval_report.py --db /tmp/wh.duckdb --json /tmp/r.json
     python3 scripts/retrieval_chart.py --json /tmp/r.json --out docs/retrieval_cost.png

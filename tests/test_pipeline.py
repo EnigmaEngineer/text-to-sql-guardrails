@@ -42,7 +42,7 @@ def check_a_write_is_refused_by_the_gate(ctx):
 def check_the_stacked_exfiltration_is_refused_end_to_end(ctx):
     """The target path is unique per run, and that is not tidiness.
 
-    It used to be a fixed name under /tmp. During the day 4 mutation run a mutant that
+    It used to be a fixed name under /tmp. During an early mutation run a mutant that
     executed a refused verdict really did write 4,001 customer emails to it, and the file
     then made every later mutant look killed, including the control. A test that asserts
     a fixed path is absent passes once and then fails forever for reasons that have
@@ -69,7 +69,7 @@ def check_the_stacked_exfiltration_is_refused_end_to_end(ctx):
 def check_valid_sql_that_the_database_rejects_is_failed_not_refused(ctx):
     """Both layers approve it and execution still fails. Two different problems.
 
-    Until day 4 this used a bad column name, which was a fair example while nothing
+    Until static validation this used a bad column name, which was a fair example while nothing
     checked names. Static validation catches that now, so the case moved and the test
     had to move with it rather than being deleted. A cast that only fails on the data
     is the honest remaining example. `agent.validate` checks that names exist and has
@@ -94,11 +94,11 @@ def check_a_bad_column_is_now_refused_before_execution(ctx):
 
 
 def check_a_host_file_read_is_refused_by_validation_not_the_gate(ctx):
-    """The day 4 finding, at the pipeline level.
+    """The validation finding, at the pipeline level.
 
     The gate step records ok because the parser really did approve it. The validate step
     is the one that says no. Asserting both matters, because a trace that blamed the
-    gate would send day 6 back to the model with the wrong correction.
+    gate would send the correction loop back to the model with the wrong correction.
     """
     a = run_with(ctx, "read a file", "SELECT * FROM read_csv('/etc/hostname')")
     eq(a.outcome, "refused", "outcome")
@@ -126,7 +126,7 @@ def check_a_generator_error_does_not_escape(ctx):
 def check_answer_is_one_attempt_and_never_loops(ctx):
     """`solve` owns the loop. `answer` stayed a single attempt and that is the boundary.
 
-    Day 6 could have grown a retry inside this function. Keeping the loop outside means
+    The correction loop could have grown a retry inside this function. Keeping the loop outside means
     every caller that wants one attempt still gets exactly one, and the retry policy
     lives in one place rather than behind a default argument. `tests/test_trace.py`
     covers the loop.

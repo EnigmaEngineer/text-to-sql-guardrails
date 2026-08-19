@@ -1,16 +1,16 @@
 """One question in, one attempt out, with every step recorded. Then `solve` loops it.
 
-This is the spine days 4 to 6 hang off. Day 4 put static validation behind `agent.guard`
+This is the spine the guard layers hang off. Static validation went behind `agent.guard`
 rather than adding a step here, so the ordering lives next to the thing it protects. Day
 5 did the same with the cost ceiling and for the same reason, so what this file gained is
 a ceiling to pass and a step to record rather than any logic. The steps are recorded in a
 list rather than logged, because the trace is a deliverable and reconstructing one from
 log lines is work nobody enjoys.
 
-Day 6 added `solve`, which calls `answer` again when a correction is worth sending. It
+The correction loop added `solve`, which calls `answer` again when a correction is worth sending. It
 calls `answer` and nothing else. It does not reach for `guard.approve`, `validate.check`
 or `cost.judge`, because a loop that assembles the layers itself is a second door into
-the database and `ot-026` is the thread that says a rule a caller has to remember is a
+the database, and a rule a caller has to remember is a
 rule that is optional. Every attempt in a trace went through the same one door as a
 single attempt does.
 """
@@ -58,7 +58,7 @@ def answer(con, question, tables, generator, chosen=None, ceiling=None, correcti
         refused         a guard layer rejected it, `detail` says which rule
         failed          the SQL was approved and the database rejected it anyway
 
-    A refusal and a database error are kept apart because day 6 has to send different
+    A refusal and a database error are kept apart because the correction loop has to send different
     things back to the model, and because collapsing them would hide the case where both
     layers approve something that cannot run. That case is the point of the `failed`
     outcome and it is not hypothetical. Static validation checks that names exist and

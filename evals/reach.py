@@ -3,7 +3,7 @@
 This lives here and not in `scripts/` on purpose. Nothing in `tests/` imports a script,
 so a number computed in a report cannot be falsified by a mutant, and on 08-06 that was
 written down as a standing rule after a decision rule sitting in a report script turned
-out to be untestable. The reach figure is the headline number of day 6. It gets to live
+out to be untestable. The reach figure is the headline number of the correction loop. It gets to live
 somewhere a test can attack it.
 
 Two sources feed it and they are not equally good.
@@ -19,7 +19,7 @@ write for each is written out below and it is hand written. That is the weak hal
 The first version of that table asked `dim_customer` for `customer_name` and
 `dim_employee` for `employee_name`. Both tables call the column `full_name`. So both
 queries came back refused as `unknown_column` and the report announced the two PII
-questions as covered, while `ot-032` says in writing that nothing in this project stops a
+questions as covered, while the README says in writing that nothing in this project stops a
 query reading PII. A typo was reading as a control. `suspect_refusals` is the check that
 catches it and it is not removable.
 """

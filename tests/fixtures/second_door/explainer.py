@@ -4,7 +4,7 @@ Nobody adds `con.execute(model_sql)` on purpose. They add a helper that only wan
 plan, or only wants a row count, and it looks harmless because it is not running the
 query for its answer. It is still model text reaching the connection.
 
-Day 5 of this project is a cost ceiling, which needs exactly this call.
+The cost layer of this project is a cost ceiling, which needs exactly this call.
 """
 
 import guard

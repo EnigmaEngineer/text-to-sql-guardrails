@@ -88,7 +88,7 @@ STRATEGY = {
     "multiple_statements": Strategy(
         STOP, False,
         "",
-        "chained statements are the exfiltration shape day 3 measured. Not coached.",
+        "chained statements are the exfiltration shape the gate measured. Not coached.",
     ),
     # --- agent.validate, static validation --------------------------------------------
     "table_function": Strategy(

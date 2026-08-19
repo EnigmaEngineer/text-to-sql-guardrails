@@ -1,6 +1,6 @@
 """The whole eval set, one row per question, and the reason there is no accuracy figure.
 
-Day 7 of the plan says "README with accuracy numbers on the eval set". There is no model
+The plan says "README with accuracy numbers on the eval set". There is no model
 here and there never has been, so an accuracy number would be a statement about
 `agent/generate.py`. What this repo can be scored on is the guard, and that is what this
 module scores.
@@ -9,9 +9,9 @@ Two halves, and they are not the same kind of evidence.
 
 The 22 answerable questions are run as their **gold SQL**, which is the frozen answer key.
 A correct outcome is an approval. This half is in sample by construction. Every guardrail
-here was run over the answer key before it shipped, because the 08-10 rule on this program
+here was run over the answer key before it shipped, because a rule I work to
 is that a guardrail is judged first on what it refuses that it should not, and three checks
-in `tests/` fail the build if any layer refuses a gold query. Day 4's first column rule
+in `tests/` fail the build if any layer refuses a gold query. The first column rule
 refused six of them and was rewritten. So this half does not measure the guard. It records
 that a standing check is still green.
 
@@ -19,7 +19,7 @@ The eight refuse-tagged questions are run as **hand written plausible SQL** from
 `evals.reach.PLAUSIBLE`, because the eval set records what should happen rather than a
 query that should not run. That is the weak input and the only out of sample half. The
 caveat travels with the number rather than sitting in a limitations section, per the
-07-31 rule on this program.
+same rule.
 
 **Pooling them is the mistake this module exists to make visible.** Score the two halves
 together and a system with no guardrails at all reads 22 of 30, because it approves every
@@ -33,16 +33,15 @@ Two readings of a refusal, and both are printed everywhere:
     matching   it was refused by the layer its `refuse_reason` points at
 
 `scripts/trace_report.py` printed the matching reading as `refused_by_something - 1` on
-day 6. That was right on the day and it is arithmetic rather than a definition, which is
-`ot-037` exactly. `OWNER` below is the definition and nothing subtracts one any more.
+the correction loop. That was right at the time and it is arithmetic rather than a definition, which is
+the whole problem. `OWNER` below is the definition and nothing subtracts one any more.
 """
 
 from evals import reach
 
 # Which guard stage owns each `refuse_reason` in the frozen eval set. None means no layer
 # in this repo owns it, which is a fact about the plan rather than an oversight. No day of
-# the blueprint carries a column policy, so `pii_export` has no owner and `ot-032` is the
-# open thread that says so.
+# the plan carries a column policy, so `pii_export` has no owner and the README says so.
 OWNER = {
     "write_operation": "gate",
     "not_in_schema": "validate",
@@ -223,7 +222,7 @@ def ablate(con, tables, rows, ceiling, approve, layers_arg="layers"):
     """Score the guard with each layer removed, one at a time and then alone.
 
     Built by calling the shipped `approve` with a subset of its own layers rather than by
-    writing a smaller guard here. The 08-01 lesson on this program is that a comparison
+    writing a smaller guard here. A lesson I have learned is that a comparison
     you construct yourself is a comparison you can accidentally rig, and a hand written
     "gate only" would be a different program that happens to share a name.
 
@@ -257,7 +256,7 @@ def lower_bound(k, n, alpha=0.05, tol=1e-9):
 
     Solves P(X >= k | p) = alpha by bisection, which is the Clopper Pearson lower limit.
     Bisection keeps this on the standard library, and the same convention was used on the
-    earlier project in this program so the two are comparable.
+    earlier project of mine so the two are comparable.
 
     5 of 8 is a handful of observations and printing 0.625 beside it invites a reader to
     treat it as a rate. The bound is what the count licenses.

@@ -1,6 +1,6 @@
 """The picture of why the metric changed.
 
-    python3 scripts/cost_chart.py --db /tmp/p10/wh.duckdb --out docs/day5_cost_metric.png
+    python3 scripts/cost_chart.py --db /tmp/p10/wh.duckdb --out docs/cost_metric.png
 
 Two panels. The left one is the choice between the two metrics, on a log axis because the
 whole point is that one of them separates the answer key from a runaway query by a factor
@@ -106,7 +106,7 @@ def main(db_path, out_path, scratch):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=os.path.join("warehouse", "retail.duckdb"))
-    ap.add_argument("--out", default=os.path.join("docs", "day5_cost_metric.png"))
+    ap.add_argument("--out", default=os.path.join("docs", "cost_metric.png"))
     ap.add_argument("--scratch", default="/tmp/p10-chart-profile.json")
     a = ap.parse_args()
     sys.exit(main(a.db, a.out, a.scratch))

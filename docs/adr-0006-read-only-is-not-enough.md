@@ -1,11 +1,10 @@
 # ADR 0006: The read-only role is the second layer, not the first
 
-Date: 2026-08-09
 Status: accepted
 
 ## Context
 
-Day 3's blueprint line is generation with a read-only role. The obvious reading is that
+The plan here is generation with a read-only role. The obvious reading is that
 the connection gets opened with `read_only=True` and the safety question is answered.
 
 It is not answered. `scripts/role_probe.py` runs every statement below against a
@@ -13,7 +12,7 @@ read-only copy of the warehouse. A statement that is refused is then retried aga
 writable copy, so a refusal caused by a mistake in the probe is reported as invalid SQL
 rather than counted as a protection.
 
-Measured 2026-08-09, duckdb 1.5.5.
+Measured on duckdb 1.5.5.
 
 | statement | read-only connection |
 |---|---|
@@ -59,13 +58,13 @@ Approval needs both of:
 - there is exactly one statement
 
 There are four refusal labels rather than one. They are `not_a_read` and
-`multiple_statements` and `unparseable` and `empty`. Day 6 has to tell a model what it
+`multiple_statements` and `unparseable` and `empty`. The correction loop has to tell a model what it
 did wrong and a single label cannot carry that.
 
 Three things follow that are easy to get wrong.
 
 **Node types are not allowlisted.** A `UNION` parses to `SET_OPERATION_NODE` rather than
-`SELECT_NODE`. There is no `UNION` anywhere in today's eval set. An allowlist written
+`SELECT_NODE`. There is no `UNION` anywhere in the frozen eval set. An allowlist written
 against it would reject a correct query the first time a question needed one, and it
 would look like a guardrail working.
 
@@ -83,15 +82,15 @@ a test rather than silently making this document stale.
 The gate refuses three of the eight refusal questions in the eval set, all three tagged
 `write_operation`, verified by running the obvious write SQL for each through the
 pipeline. The other five are not reachable by anything built so far. One needs the column
-checker on day 4, two need the cost ceiling on day 5, and two are `pii_export` and have
+checker, two need the cost ceiling, and two are `pii_export` and have
 no layer designed for them at all.
 
 That last gap is the honest cost of this decision. A `SELECT customer_email FROM
 dim_customer` is a single read, it passes the gate cleanly, and it is exactly what
 question q026 asks for. Nothing in this repo currently stops it. A column level policy is
-the obvious answer and it is not on the blueprint for any day, so it is carried as an open
+the obvious answer and nothing in the plan asks for it, so it is carried as an open
 thread rather than quietly added to a later day's line.
 
-No accuracy number is claimed today. There is no model in this environment, so generation
+No accuracy number is claimed. There is no model in this environment, so generation
 runs through a scripted fixture and the 22 of 22 in `scripts/generation_report.py` is a
 statement about the plumbing.

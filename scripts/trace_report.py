@@ -132,8 +132,8 @@ def reach_section(con, tables, rows, ceiling):
     print("  unreached %d  %s" % (len(unreached), ", ".join(unreached)))
 
     refused = measured.refused_by_something
-    # Day 6 printed the matching reading as `refused - 1`. That was true on the day and
-    # it was arithmetic rather than a definition, which is `ot-037`. Day 7 computes it
+    # The correction loop printed the matching reading as `refused - 1`. That was true on the day and
+    # it was arithmetic rather than a definition. It is computed
     # from `scorecard.OWNER`, so the two readings can disagree by any amount.
     card = scorecard.score(con, tables, rows, ceiling, guard.approve, "trace_report")
     matching = card.refused("matching")

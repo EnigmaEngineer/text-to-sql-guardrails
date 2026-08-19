@@ -9,13 +9,13 @@ behind an interface with two implementations that are real and one that refuses.
     RefusingGenerator   answers CANNOT_ANSWER to everything. The other end of the range.
     NotConfigured       what you get when no backend is set. Raises and says why.
 
-What this buys is that the rest of the agent can be built and tested today, which is the
+What this buys is that the rest of the agent can be built and tested now, which is the
 part the project is actually about. The prompt goes in and text comes out. The text is
 parsed and the gate judges it. The warehouse runs it and the answer is compared to gold.
 Every step of that is real. Only the middle is a fixture.
 
 What it does not buy is an accuracy number. **A score produced with ScriptedGenerator is
-a statement about this file and not about any model.** Day 7 needs a real backend before
+a statement about this file and not about any model.** The scorecard needs a real backend before
 it can report accuracy, and that is tracked rather than assumed.
 
 TODO(day7): wire a real backend. Blocker is that the scheduled sandbox has no model
@@ -87,7 +87,7 @@ class ScriptedGenerator(Generator):
 
 
 class SequenceGenerator(Generator):
-    """Replays a list of answers per question, one per call. Written for day 6.
+    """Replays a list of answers per question, one per call. Written for the correction loop.
 
     `ScriptedGenerator` cannot exercise a retry loop and that is not a small point. It is
     keyed by question, so the second call returns whatever the first call returned. A loop

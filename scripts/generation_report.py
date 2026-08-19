@@ -1,4 +1,4 @@
-"""Run the day 3 pipeline over the frozen eval set and report what it can and cannot do.
+"""Run the pipeline over the frozen eval set and report what it can and cannot do.
 
     python3 scripts/generation_report.py --db /tmp/p10/wh.duckdb
 
@@ -7,7 +7,7 @@
 the environment this repo is built in. What the run proves is that the prompt builds and
 the output parses. The gate approves a correct query. The warehouse executes it and the
 answer matches the frozen result. That is the plumbing. A model would have to write the
-SQL for the number to mean anything, and day 7 is where that happens.
+SQL for the number to mean anything, and the scorecard is where that happens.
 
 The second half is the part worth reading. Eight questions in the eval set expect a
 refusal, and this counts how many the guardrails built so far can actually catch.
@@ -27,13 +27,13 @@ from warehouse import catalog
 # This is a claim about what each layer inspects, not a measurement. A cost ceiling
 # cannot see PII and a column checker cannot see cost.
 COVERAGE = {
-    "write_operation": ("day 3, the read-only role and the single read gate", True),
-    "not_in_schema": ("day 4, static validation against the catalog", True),
-    "pii_export": ("not yet designed, needs a column policy, ot-032", False),
-    # q029 in this category is refused by the day 4 cross join rule. That is not cost
+    "write_operation": ("the gate, the read-only role and the single read gate", True),
+    "not_in_schema": ("static validation, static validation against the catalog", True),
+    "pii_export": ("not yet designed, needs a column policy", False),
+    # q029 in this category is refused by the cross join rule. That is not cost
     # coverage. q028 is the same category, has no cross join, and passes everything.
     # See scripts/validation_report.py, which prints both.
-    "unbounded_scan": ("day 5, cost estimation and the execution ceiling", False),
+    "unbounded_scan": ("the cost layer, cost estimation and the execution ceiling", False),
 }
 
 # The obvious wrong SQL for each covered question, written by hand. This demonstrates the
@@ -44,7 +44,7 @@ NAIVE_SQL = {
     "q023": "DELETE FROM retail.fct_order_header WHERE order_status = 'cancelled'",
     "q024": "UPDATE retail.dim_customer SET loyalty_tier = 'platinum' WHERE customer_id = 1001",
     "q025": "DROP TABLE retail.fct_order_line",
-    # Day 4. The question asks for a score the warehouse does not hold, so the plausible
+    # Validation. The question asks for a score the warehouse does not hold, so the plausible
     # wrong answer is a column that does not exist rather than a write.
     "q030": "SELECT customer_id, churn_probability FROM retail.dim_customer",
 }

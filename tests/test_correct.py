@@ -67,9 +67,9 @@ def refusal_codes():
 def check_the_scanner_finds_something():
     """A check that can pass on zero inputs will be pointed at zero inputs.
 
-    Four things in this program have now reported clean on an empty list. The prose
-    checker was one. The day 3 gate on a string of semicolons was another. So was
-    `depcheck.py` with no arguments and the day 4 validator on a query with no base
+    Four tools of mine have now reported clean on an empty list. The prose
+    checker was one. The parser gate on a string of semicolons was another. So was
+    `depcheck.py` with no arguments and the catalog validator on a query with no base
     tables. A scanner is worth nothing without a floor under what it may find.
     """
     codes = refusal_codes()
@@ -161,7 +161,7 @@ def check_an_empty_correction_does_not_change_the_prompt(ctx):
     """Found by a mutant that appended the correction section unconditionally.
 
     An empty correction then added two characters to every prompt in the repo, which is
-    invisible to a reader and drifts away from the prompt sizes day 3 published. The
+    invisible to a reader and drifts away from the prompt sizes the gate published. The
     parser still worked, so nothing else caught it.
 
     Built off the real catalog rather than a hand made table. The first draft used a

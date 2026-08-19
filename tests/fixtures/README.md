@@ -23,5 +23,5 @@ editing a fixture does not quietly break the assertion.
 | `quiet/` | A module that calls nothing, for the call name detector. |
 
 The last three exist because a detector handed no input must say so. Returning a clean
-empty result is how four separate checks in this program have passed while looking at
+empty result is how four separate checks in my own tooling have passed while looking at
 nothing.

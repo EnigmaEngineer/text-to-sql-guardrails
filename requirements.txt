@@ -1,4 +1,4 @@
 # Everything except the embedding scorer runs on these two.
-# Versions are the ones the 2026-08-08 numbers were measured on, not a floor.
+# Versions are the ones the published numbers were measured on, not a floor.
 duckdb==1.5.5
 matplotlib==3.10.9

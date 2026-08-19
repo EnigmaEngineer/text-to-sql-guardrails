@@ -1,6 +1,6 @@
 """Draw the scorecard. One measurement, two panels, no new numbers.
 
-    python3 scripts/scorecard_chart.py --db /tmp/wh.duckdb --out docs/day7_scorecard.png
+    python3 scripts/scorecard_chart.py --db /tmp/wh.duckdb --out docs/scorecard.png
 
 The left panel is the pooled score for the two degenerate arms and the real one, with the
 floor drawn across it. The point of the picture is the shaded region, which is the part of
@@ -77,7 +77,7 @@ def main(db_path, out_path):
     ax2.invert_yaxis()
 
     fig.suptitle(
-        "text-to-sql-guardrails, day 7. There is no accuracy number here, "
+        "text-to-sql-guardrails, the scorecard. There is no accuracy number here, "
         "because nothing has called a model.", fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(out_path, dpi=130)
@@ -89,6 +89,6 @@ def main(db_path, out_path):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=os.path.join(ROOT, "warehouse", "retail.duckdb"))
-    ap.add_argument("--out", default=os.path.join(ROOT, "docs", "day7_scorecard.png"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "docs", "scorecard.png"))
     a = ap.parse_args()
     sys.exit(main(a.db, a.out))

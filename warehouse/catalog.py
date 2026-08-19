@@ -1,7 +1,7 @@
 """Read the catalog out of the live database rather than out of the DDL text.
 
 Parsing schema.sql would give a catalog that agrees with the file and can still disagree
-with the database. Day 4 has to answer "does this column exist", and the only answer that
+with the database. Static validation has to answer "does this column exist", and the only answer that
 is worth anything comes from the thing the query will actually run against.
 """
 
@@ -55,7 +55,7 @@ def read(con, schema="retail"):
 
 
 def render_all(tables):
-    """The whole schema as prompt text. Day 2 exists because this is too big to send."""
+    """The whole schema as prompt text. The retrieval layer exists because this is too big to send."""
     return "\n".join(t.render() for t in tables)
 
 

@@ -4,7 +4,7 @@ Two decisions carried in from earlier days.
 
 `adr-0005` measured retrieval on this warehouse and found the prize is under 600
 characters on a 2,716 character schema. So the default here sends the whole schema and
-`tables` is an optional narrowing that day 7 reports as a separate column. The retrieval
+`tables` is an optional narrowing that the scorecard reports as a separate column. The retrieval
 layer is still built and still tested. It is just not on the path by default.
 
 `adr-0004` says there is no token budget, because the tokeniser belongs to a model that
@@ -34,7 +34,7 @@ RULES = (
 )
 
 # The refusal token is checked for equality, so it is defined once and imported rather
-# than typed again in the parser. Day 4 reads this.
+# than typed again in the parser. Static validation reads this.
 CANNOT_ANSWER = "CANNOT_ANSWER"
 
 PREAMBLE = (
@@ -95,7 +95,7 @@ def render_schema(tables, chosen=None):
     """Schema block. `chosen` narrows it to a table set, which is the retrieval path.
 
     Rendered by `catalog.render_all` rather than by a second renderer here, so the
-    number in the prompt and the number day 2 published cannot drift apart.
+    number in the prompt and the number the retrieval layer published cannot drift apart.
     """
     if chosen is not None:
         tables = tuple(t for t in tables if t.name in chosen)

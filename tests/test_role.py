@@ -99,7 +99,7 @@ def check_empty_input_is_refused(ctx):
 
 
 def check_garbage_is_unparseable_not_a_write(ctx):
-    """Two different refusals. Day 6 sends different feedback for each."""
+    """Two different refusals. The correction loop sends different feedback for each."""
     d = role.inspect(ctx.con, "SELECT FROM WHERE")
     true(not d.allowed, "garbage")
     eq(d.reason, "unparseable", "reason")
@@ -146,7 +146,7 @@ def check_every_gold_query_passes_the_gate(ctx):
 
 
 def check_the_gate_alone_approves_a_query_that_reads_the_host(ctx):
-    """The day 4 finding, pinned where the day 3 gate lives.
+    """The validation finding, pinned where the parser gate lives.
 
     `read_csv` on a path is a single SELECT, so this layer approves it and is right to.
     Refusing it is `agent.validate`'s job. The check is here so that anyone reading

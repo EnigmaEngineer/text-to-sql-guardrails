@@ -68,7 +68,7 @@ def prompt_chars(tables, chosen):
 
     Rendered the same way `catalog.render_all` renders the whole schema, one table per
     line. Counting a trailing newline on the last line would put this a character above
-    the figure day 1 published for the full schema, which is the kind of one character
+    the figure first published for the full schema, which is the kind of one character
     disagreement that wastes an afternoon later.
     """
     picked = [t for t in tables if t.name in chosen]

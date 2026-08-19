@@ -1,7 +1,7 @@
 """Checks on the composed guard, and on the shape of the code around it.
 
 The last check in this file is the one that matters most and it does not run any SQL.
-`ot-026` is an open thread from an earlier project about a rule that a caller has to
+A lesson from an earlier project of mine, about a rule that a caller has to
 remember to invoke. The answer here is that there is one door, and the way to keep it
 one door is to fail the suite when a second appears.
 """
@@ -104,7 +104,7 @@ def check_model_sql_can_only_reach_the_database_through_guard():
     second one. Behaviour tests cannot catch that, because the new path would have its
     own passing tests.
 
-    The detector moved to `tests/structural.py` for `ot-034`, so that its own behaviour
+    The detector moved to `tests/structural.py`, so that its own behaviour
     is covered by `tests/test_structural.py` instead of by a manual demonstration. The
     scanned count is asserted here as well as there, because this is the call site that
     would go vacuous if `agent/` ever moved.
@@ -137,7 +137,7 @@ def check_execute_does_not_raise_when_approve_does(ctx):
 
     A qualifier no relation defines, inside a statement that has a CTE, is skipped by
     validation because resolving it needs name resolution. `EXPLAIN` then binds it and
-    raises. Found by the day 7 audit while probing the join rule change.
+    raises. Found by a later review while probing the join rule change.
     """
     sql = (
         "WITH c AS (SELECT 1 AS x) SELECT h.order_id FROM retail.fct_order_header h "

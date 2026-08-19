@@ -1,6 +1,6 @@
 """Score a table against a question by shared words. No model, no download.
 
-This is the baseline the embedding has to beat. On the previous project in this program
+This is the baseline the embedding has to beat. On a previous project of mine
 bm25 beat a dense retriever on most of the metrics that mattered, so a lexical baseline
 is not a straw man here.
 

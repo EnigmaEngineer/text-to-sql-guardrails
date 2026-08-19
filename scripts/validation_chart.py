@@ -1,10 +1,10 @@
-"""Draw the day 4 result. Reads the report's json, computes nothing of its own.
+"""Draw the static validation result. Reads the report's json, computes nothing of its own.
 
     python3 scripts/validation_report.py --db /tmp/p10/wh.duckdb --json /tmp/v.json
     python3 scripts/validation_chart.py --json /tmp/v.json --out docs/gate_vs_validation.png
 
 One row per probe, coloured by which layer stopped it. The bar that matters is the middle
-colour. Every one of those is a query the day 3 gate approved and the database ran.
+colour. Every one of those is a query the parser gate approved and the database ran.
 """
 
 import argparse
@@ -63,8 +63,8 @@ def main(json_path, out_path):
     ax.legend(
         handles,
         [
-            "refused by the day 3 parser gate",
-            "approved by the gate, refused by day 4 validation",
+            "refused by the parser gate",
+            "approved by the gate, refused by static validation validation",
             "approved by both, correctly",
         ],
         loc="upper center",

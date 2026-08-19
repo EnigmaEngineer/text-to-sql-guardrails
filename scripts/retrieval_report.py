@@ -34,7 +34,7 @@ def _compare(runs, rows, rel, results):
     """Every pairwise comparison at the largest k, with the p value beside it.
 
     Computed here rather than written into prose. A count in a sentence goes stale the
-    moment the thing it counts changes, and this program has published two wrong
+    moment the thing it counts changes, and I have published two wrong
     headline numbers that way already.
     """
     k = KS[-1]
