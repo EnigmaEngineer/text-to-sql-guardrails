@@ -58,8 +58,8 @@ Approval needs both of:
 - there is exactly one statement
 
 There are four refusal labels rather than one. They are `not_a_read` and
-`multiple_statements` and `unparseable` and `empty`. The correction loop has to tell a model what it
-did wrong and a single label cannot carry that.
+`multiple_statements` and `unparseable` and `empty`. The correction loop has to tell a
+model what it did wrong and a single label cannot carry that.
 
 Three things follow that are easy to get wrong.
 

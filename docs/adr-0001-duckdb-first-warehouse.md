@@ -4,9 +4,9 @@ Status: accepted
 
 ## Context
 
-The project targets Snowflake. There is no Snowflake account. The cost layer has to estimate query
-cost from `EXPLAIN` output and the write-up has to publish accuracy numbers, and both of those
-are worthless if they were never executed anywhere.
+The project targets Snowflake. There is no Snowflake account. The cost layer has to
+estimate query cost from `EXPLAIN` output and the write-up has to publish accuracy
+numbers, and both of those are worthless if they were never executed anywhere.
 
 Two bad options were available. Write Snowflake SQL and never run it, which produces a
 repo full of untested strings. Or spend the first week acquiring and loading a trial
@@ -23,9 +23,9 @@ every cost number the project publishes becomes unfounded, so the flag is worth 
 ## Consequences
 
 Cost estimation is the part that suffers. DuckDB's `EXPLAIN` gives a plan and a row
-estimate. Snowflake's `EXPLAIN USING JSON` gives bytes scanned and partition counts, which
-is a different and better input to a spend ceiling. The cost layer will build the ceiling against
-what DuckDB offers and the Snowflake mapping stays unverified.
+estimate. Snowflake's `EXPLAIN USING JSON` gives bytes scanned and partition counts,
+which is a different and better input to a spend ceiling. The cost layer will build the
+ceiling against what DuckDB offers and the Snowflake mapping stays unverified.
 
 The honest statement in the README is that the cost model was tuned on one engine and
 ported to another on paper. That is weaker than a measured claim and it is what the

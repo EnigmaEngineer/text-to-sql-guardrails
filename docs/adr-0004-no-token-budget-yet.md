@@ -4,8 +4,9 @@ Status: accepted
 
 ## Context
 
-The retrieval layer builds schema retrieval so that only relevant tables enter the prompt. The natural
-The obvious move is to set a token budget for the schema block and build towards it.
+The retrieval layer builds schema retrieval so that only relevant tables enter the
+prompt. The natural The obvious move is to set a token budget for the schema block and
+build towards it.
 
 That is the exact mistake made on an earlier project of mine, where a 512 token
 chunk budget was fixed before choosing the model that would tokenise it. A budget in
@@ -31,7 +32,7 @@ tokens, which means the whole schema fits in a prompt and retrieval would be
 solving a problem this warehouse does not have.
 
 That is worth saying plainly rather than hiding. The retrieval layer is being built
-against a warehouse where it is not yet needed. The retrieval layer has to either widen the warehouse
-until retrieval earns its place, or state that the layer is there for the wide case and
-measure what it costs on the narrow one. Building it and quietly implying it was necessary
-is the outcome this record exists to prevent.
+against a warehouse where it is not yet needed. The retrieval layer has to either widen
+the warehouse until retrieval earns its place, or state that the layer is there for the
+wide case and measure what it costs on the narrow one. Building it and quietly implying
+it was necessary is the outcome this record exists to prevent.

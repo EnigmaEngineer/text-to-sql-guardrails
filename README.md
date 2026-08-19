@@ -560,9 +560,9 @@ the outcome.
 ## A validation rule with a false positive it does not know about
 
 Left alone when I found it, because it belongs to the validation layer and the fix is a
-design question rather than a patch. `unrelated_join` refuses any join whose condition touches fewer than two distinct
-tables. A self join always resolves both aliases to one table, so every self join is
-refused, including this one:
+design question rather than a patch. `unrelated_join` refuses any join whose condition
+touches fewer than two distinct tables. A self join always resolves both aliases to one
+table, so every self join is refused, including this one:
 
 ```sql
 SELECT count(*) FROM retail.fct_order_header a
@@ -699,11 +699,12 @@ run of newlines. That is an eighth distinct way something has passed here while 
 wrong.
 
 **The refusal coverage figure depends on an unstated convention.** The repo has been
-quoting 4 of 8. Five of the eight are refused by something. The difference is q029, which
-is labelled `unbounded_scan` and is stopped by the cross join rule in validation, so the reading
-that counts a question as covered only when the layer matching its label catches it gives
-4 and the reading that counts any refusal gives 5. Both are now printed side by side, with
-the reason, so the number cannot be quoted without the convention attached.
+quoting 4 of 8. Five of the eight are refused by something. The difference is q029,
+which is labelled `unbounded_scan` and is stopped by the cross join rule in validation,
+so the reading that counts a question as covered only when the layer matching its label
+catches it gives 4 and the reading that counts any refusal gives 5. Both are now printed
+side by side, with the reason, so the number cannot be quoted without the convention
+attached.
 
 ### Mutation over the correction loop
 
@@ -713,10 +714,10 @@ thirteen was aimed at code the first had not touched. Six survived it and none w
 unreachable branch.
 
 Two of the six were the shape the cost layer threw up, which is a branch contributing
-nothing right now that must stay anyway. Both got a stubbed test rather than a deletion. One is the loop running
-the answer key through the guard. It fires only when a guardrail starts refusing correct
-queries. The other is the second entry in `NAME_ERROR_CODES`, which nothing currently
-trips. After the six fixes both rounds kill everything.
+nothing right now that must stay anyway. Both got a stubbed test rather than a deletion.
+One is the loop running the answer key through the guard. It fires only when a guardrail
+starts refusing correct queries. The other is the second entry in `NAME_ERROR_CODES`,
+which nothing currently trips. After the six fixes both rounds kill everything.
 
 ## The scorecard, and the floor underneath it
 

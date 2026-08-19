@@ -35,6 +35,7 @@ worth having.
 
 The set has 30 questions and 22 of them are scorable against a gold answer. Carrying
 forward a finding from the previous project, a comparison between two systems needs at
-least 6 questions to disagree before a two sided permutation test can reach p below 0.05.
-That is 20 percent of the set. Anything smaller than that is not a result and the write-up has to
-say so rather than reporting a gap that could never have been significant.
+least 6 questions to disagree before a two sided permutation test can reach p below
+0.05. That is 20 percent of the set. Anything smaller than that is not a result and the
+write-up has to say so rather than reporting a gap that could never have been
+significant.

@@ -8,8 +8,8 @@ Status: accepted
 two things. Widen the warehouse until retrieval earns its place, or state that the layer
 is for the wide case and measure what it costs on the narrow one.
 
-The retrieval layer took the second. Widening the warehouse to make a layer look necessary is arranging
-the evidence to fit the plan.
+The retrieval layer took the second. Widening the warehouse to make a layer look
+necessary is arranging the evidence to fit the plan.
 
 ## What was measured
 
@@ -67,8 +67,8 @@ not get is a sentence implying it was necessary here.
 
 ## Consequences
 
-The scorecard reports accuracy with the whole schema in the prompt. Retrieval numbers sit beside
-it as a separate column, not as the headline.
+The scorecard reports accuracy with the whole schema in the prompt. Retrieval numbers
+sit beside it as a separate column, not as the headline.
 
 Two findings are carried forward rather than fixed here.
 

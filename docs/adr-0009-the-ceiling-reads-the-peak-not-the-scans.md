@@ -112,8 +112,9 @@ have hurt.
 
 ## Consequences
 
-- One more refusal reason for the correction loop to feed back to a model, and it is actionable. Over
-  the ceiling means add a filter. Unscored operator means name your join keys.
+- One more refusal reason for the correction loop to feed back to a model, and it is
+  actionable. Over the ceiling means add a filter. Unscored operator means name your
+  join keys.
 - `agent.guard.plan_of` is a second `.execute()` of model text and it lives behind the
   same door as the first. The structural check refused an earlier draft that built
   eighteen `count(*)` statements by string formatting, and it was right to.

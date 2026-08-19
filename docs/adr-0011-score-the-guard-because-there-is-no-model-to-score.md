@@ -73,11 +73,11 @@ percent lower bound on 5 of 8 is 0.289.
 | validate only | 27 | 5 of 8 | 1 of 8 | 0 |
 | cost only | 23 | 1 of 8 | 1 of 8 | 4 |
 
-**Removing the cost layer changes nothing on this set.** All that work, and the
-frozen questions cannot see it. The cost layer said this in words. The ablation makes it a number,
-and `check_taking_the_cost_layer_away_changes_nothing_on_this_set` pins it so that a
-later change which makes the cost layer earn its place fails the suite and forces this
-paragraph to be rewritten.
+**Removing the cost layer changes nothing on this set.** All that work, and the frozen
+questions cannot see it. The cost layer said this in words. The ablation makes it a
+number, and `check_taking_the_cost_layer_away_changes_nothing_on_this_set` pins it so
+that a later change which makes the cost layer earn its place fails the suite and forces
+this paragraph to be rewritten.
 
 **Removing the parser gate also changes nothing under the reading this repo quoted for
 five days.** Static validation refuses `DELETE` on its own. It comes back as
@@ -87,10 +87,10 @@ visible in the matching reading. That is 4 of 8 with the gate and 1 of 8 without
 repo quoting one number would have concluded the gate was redundant.
 
 **The cost layer alone raises on four questions instead of refusing them.** `EXPLAIN` on
-a `DELETE` over a read-only connection is an `InvalidInputException`, and `EXPLAIN` on an
-unknown column is a `BinderException`. The cost layer put cost last on the argument that `EXPLAIN`
-binds and binding a table function opens what it points at. Here is the cruder second
-reason. Run first, it does not refuse. It explodes.
+a `DELETE` over a read-only connection is an `InvalidInputException`, and `EXPLAIN` on
+an unknown column is a `BinderException`. The cost layer put cost last on the argument
+that `EXPLAIN` binds and binding a table function opens what it points at. Here is the
+cruder second reason. Run first, it does not refuse. It explodes.
 
 ## Costs
 
