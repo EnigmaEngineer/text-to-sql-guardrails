@@ -31,22 +31,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGENT_DIR = os.path.join(ROOT, "agent")
 QUESTIONS = os.path.join(ROOT, "evals", "questions.jsonl")
 
-
 def _rows():
     with open(QUESTIONS, encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
-
 def _tables(ctx):
     return catalog.read(ctx.con)
 
-
 def _outcome(qid, expect, reason, allowed, stage, code="c"):
     return scorecard.Outcome(qid, expect, reason, allowed, stage, code)
-
-
-# --- the readings ------------------------------------------------------------------
-
 
 def check_a_raise_is_not_coverage():
     """A crash decided nothing. It is wrong on an answer and wrong on a refusal."""
@@ -56,7 +49,6 @@ def check_a_raise_is_not_coverage():
     true(not crashed_refuse.correct("any"), "a crash on a refusal question, any reading")
     true(not crashed_refuse.correct("matching"), "same under the matching reading")
     true(crashed_refuse.raised, "and it is reported as raised rather than refused")
-
 
 def check_the_matching_reading_is_not_refused_minus_one():
     """A gap of two. Anything subtracting one from the any reading fails this."""
@@ -69,7 +61,6 @@ def check_the_matching_reading_is_not_refused_minus_one():
     eq(card.refused("matching"), 1, "refused by the owning layer")
     eq(len(card.mislabelled()), 2, "the gap between the two readings")
 
-
 def check_an_unowned_refusal_is_never_matching():
     """`pii_export` has no owning layer. Refusing it by accident is not coverage of it."""
     o = _outcome("q026", "refuse", "pii_export", False, "validate")
@@ -77,15 +68,12 @@ def check_an_unowned_refusal_is_never_matching():
     true(not o.correct("matching"), "but no layer owns pii_export")
     true(o.owner is None, "owner")
 
-
 def check_an_approved_refusal_question_is_wrong_both_ways():
     o = _outcome("q028", "refuse", "unbounded_scan", True, "approved")
     true(not o.correct("any"), "any")
     true(not o.correct("matching"), "matching")
 
-
-# --- the eval set and the owner table ----------------------------------------------
-
+# the eval set and the owner table
 
 def check_the_owner_table_is_driven_off_the_eval_set():
     """Every `refuse_reason` in the frozen set has an entry, including the None ones.
@@ -98,12 +86,10 @@ def check_the_owner_table_is_driven_off_the_eval_set():
     stray = sorted(k for k in scorecard.OWNER if k not in reasons)
     eq(stray, [], "OWNER entries no question uses")
 
-
 def check_every_owner_is_a_real_guard_layer_or_none():
     for reason, owner in scorecard.OWNER.items():
         true(owner is None or owner in guard.LAYERS,
              "owner of %s is a real layer or None" % reason)
-
 
 def check_the_refuse_half_has_hand_written_sql_and_says_so():
     """The weak input is flagged at the point of use, not in a limitations section."""
@@ -111,10 +97,6 @@ def check_the_refuse_half_has_hand_written_sql_and_says_so():
     from evals import reach
     ids = {r["id"] for r in _rows() if r["expect"] != "answer"}
     eq(sorted(reach.PLAUSIBLE), sorted(ids), "every refuse question has plausible sql")
-
-
-# --- the arms ----------------------------------------------------------------------
-
 
 def check_the_open_arm_is_the_floor_and_it_is_measured(ctx):
     """Approve everything and the pooled score is the number of answerable questions.
@@ -128,7 +110,6 @@ def check_the_open_arm_is_the_floor_and_it_is_measured(ctx):
     eq(card.pooled("any"), answerable, "pooled score of a system with no guardrails")
     eq(card.refused("any"), 0, "it refuses nothing")
 
-
 def check_the_closed_arm_scores_worse_than_the_open_one(ctx):
     """A metric where refusing everything wins is a metric to throw away."""
     rows = _rows()
@@ -136,7 +117,6 @@ def check_the_closed_arm_scores_worse_than_the_open_one(ctx):
     closed = scorecard.score(ctx.con, tables, rows, None, scorecard.closed_guard, "closed")
     open_ = scorecard.score(ctx.con, tables, rows, None, scorecard.open_guard, "open")
     true(closed.pooled("any") < open_.pooled("any"), "closed scores below open")
-
 
 def check_the_real_arm_beats_the_open_one(ctx):
     from agent import cost
@@ -148,10 +128,6 @@ def check_the_real_arm_beats_the_open_one(ctx):
     true(real.pooled("any") > open_.pooled("any"), "the guard is worth something")
     eq(real.approved_gold(), sum(1 for r in rows if r["expect"] == "answer"),
        "no gold query is refused")
-
-
-# --- the layers argument -----------------------------------------------------------
-
 
 def check_approve_with_no_layers_raises_rather_than_approving(ctx):
     """The failure mode this argument creates, closed on purpose.
@@ -165,14 +141,12 @@ def check_approve_with_no_layers_raises_rather_than_approving(ctx):
         "approve with no layers",
     )
 
-
 def check_approve_rejects_a_layer_name_it_does_not_have(ctx):
     raises(
         lambda: guard.approve(ctx.con, _tables(ctx), "SELECT 1", None, ("gate", "pii")),
         "unknown layer",
         "approve with a made up layer",
     )
-
 
 def check_nothing_in_agent_passes_the_layers_argument():
     """The escape hatch is for the ablation and for nothing else.
@@ -196,7 +170,6 @@ def check_nothing_in_agent_passes_the_layers_argument():
                     offenders.append("%s:%d" % (name, node.lineno))
     eq(offenders, [], "calls in agent/ passing layers=")
 
-
 def check_taking_the_cost_layer_away_changes_nothing_on_this_set(ctx):
     """Not a happy check. It is the scorecard finding and it is pinned so it cannot drift.
 
@@ -215,7 +188,6 @@ def check_taking_the_cost_layer_away_changes_nothing_on_this_set(ctx):
     )
     eq(without.pooled("any"), full.pooled("any"), "pooled score without the cost layer")
     eq(without.refused("any"), full.refused("any"), "refusals without the cost layer")
-
 
 def check_running_cost_first_crashes_rather_than_refusing(ctx):
     """The cost layer put cost last because EXPLAIN binds. Here is the cruder second reason.
@@ -237,15 +209,10 @@ def check_running_cost_first_crashes_rather_than_refusing(ctx):
     true("InvalidInputException" in codes,
          "EXPLAIN on a write raises, it does not refuse")
 
-
-# --- the bound ---------------------------------------------------------------------
-
-
 def check_the_lower_bound_reproduces_two_figures_from_an_earlier_project():
     """Anchors, not self consistency. Both were computed independently by hand."""
     eq(round(scorecard.lower_bound(10, 10), 3), 0.741, "10 of 10")
     eq(round(scorecard.lower_bound(3, 10), 3), 0.087, "3 of 10")
-
 
 def check_the_lower_bound_satisfies_its_own_defining_equation():
     """P(X >= k | p) is alpha at the bound. Checked on the case the README quotes."""
@@ -255,7 +222,6 @@ def check_the_lower_bound_satisfies_its_own_defining_equation():
         true(abs(tail - 0.05) < 1e-6,
              "tail at the bound for %d of %d is 0.05, got %.8f" % (k, n, tail))
 
-
 def check_the_lower_bound_on_the_degenerate_counts():
     """Zero successes licenses nothing. All successes still does not license one."""
     eq(scorecard.lower_bound(0, 8), 0.0, "0 of 8")
@@ -263,14 +229,12 @@ def check_the_lower_bound_on_the_degenerate_counts():
     true(scorecard.lower_bound(5, 8) < 5.0 / 8.0, "the bound sits below the point estimate")
     raises(lambda: scorecard.lower_bound(9, 8), "between 0 and n", "k larger than n")
 
-
 def check_the_bound_falls_as_the_count_shrinks():
     """More observations at the same rate buy a higher bound. A monotonicity a wrong
     implementation is unlikely to have by accident."""
     small = scorecard.lower_bound(5, 8)
     large = scorecard.lower_bound(50, 80)
     true(large > small, "80 observations at the same rate license more than 8")
-
 
 def check_excluding_the_cost_layer_really_excludes_it(ctx):
     """The companion to the check above, and a mutant is why it exists.

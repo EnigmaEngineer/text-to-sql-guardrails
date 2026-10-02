@@ -14,10 +14,8 @@ from agent import validate
 from tests.harness import eq, true
 from warehouse import catalog
 
-
 def _tables(ctx):
     return catalog.read(ctx.con)
-
 
 def check_a_gold_query_is_clean(ctx):
     tables = _tables(ctx)
@@ -31,7 +29,6 @@ def check_a_gold_query_is_clean(ctx):
     true(r.ok, "clean join query: %s" % (r.codes(),))
     eq(r.tables, frozenset({"dim_customer", "fct_order_header"}), "tables found")
     true(r.checked_columns >= 3, "checked some columns, got %d" % r.checked_columns)
-
 
 def check_an_output_alias_in_order_by_is_not_an_unknown_column(ctx):
     """The false refusal that would have killed this feature.
@@ -51,7 +48,6 @@ def check_an_output_alias_in_order_by_is_not_an_unknown_column(ctx):
     # And the alias must not have been counted as a column that was verified.
     true(r.skipped_columns >= 1, "the alias was skipped, got %d" % r.skipped_columns)
 
-
 def check_an_alias_does_not_launder_a_bad_column(ctx):
     """`AS orders` binds `orders`. It does not make `nope` acceptable."""
     sql = (
@@ -59,7 +55,6 @@ def check_an_alias_does_not_launder_a_bad_column(ctx):
     )
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unknown_column" in r.codes(), "codes %s" % (r.codes(),))
-
 
 def check_every_gold_query_validates_clean(ctx):
     """If the validator refuses the answer key, the validator is wrong.
@@ -80,23 +75,19 @@ def check_every_gold_query_validates_clean(ctx):
             bad.append((row["id"], r.codes()))
     eq(bad, [], "gold queries with findings")
 
-
 def check_unknown_table_is_caught(ctx):
     r = validate.check(ctx.con, _tables(ctx), "SELECT * FROM retail.fct_nope")
     true("unknown_table" in r.codes(), "codes %s" % (r.codes(),))
-
 
 def check_unknown_column_is_caught_when_qualified(ctx):
     sql = "SELECT c.not_a_column FROM retail.dim_customer c"
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unknown_column" in r.codes(), "codes %s" % (r.codes(),))
 
-
 def check_unknown_column_is_caught_when_bare(ctx):
     sql = "SELECT not_a_column FROM retail.dim_customer"
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unknown_column" in r.codes(), "codes %s" % (r.codes(),))
-
 
 def check_a_bare_column_from_the_other_side_of_a_join_is_fine(ctx):
     """The rule is "exists in some table in play", not "exists in the first table"."""
@@ -106,7 +97,6 @@ def check_a_bare_column_from_the_other_side_of_a_join_is_fine(ctx):
     )
     r = validate.check(ctx.con, _tables(ctx), sql)
     true(r.ok, "order_status belongs to the joined table: %s" % (r.codes(),))
-
 
 def check_columns_are_skipped_rather_than_guessed_under_a_cte(ctx):
     """A CTE binds names this module cannot see, so bare columns go unchecked.
@@ -124,14 +114,12 @@ def check_columns_are_skipped_rather_than_guessed_under_a_cte(ctx):
     true(r.ok, "no findings: %s" % (r.codes(),))
     true(r.skipped_columns > 0, "skips are counted, got %d" % r.skipped_columns)
 
-
 def check_a_derived_table_alias_is_not_reported_as_unknown(ctx):
     sql = (
         "SELECT s.oid FROM (SELECT order_id AS oid FROM retail.fct_order_header) s"
     )
     r = validate.check(ctx.con, _tables(ctx), sql)
     true(r.ok, "derived alias is skipped, not refused: %s" % (r.codes(),))
-
 
 def check_table_function_is_refused(ctx):
     """The one the parser gate approves and runs."""
@@ -144,7 +132,6 @@ def check_table_function_is_refused(ctx):
         r = validate.check(ctx.con, tables, sql)
         true("table_function" in r.codes(), "%r gave %s" % (sql, r.codes()))
 
-
 def check_a_table_function_hidden_in_a_subquery_is_still_caught(ctx):
     """A regex on the FROM clause would miss this. The parse tree does not."""
     sql = (
@@ -154,7 +141,6 @@ def check_a_table_function_hidden_in_a_subquery_is_still_caught(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("table_function" in r.codes(), "codes %s" % (r.codes(),))
 
-
 def check_a_query_reading_no_table_is_refused(ctx):
     """The vacuous pass, made loud.
 
@@ -163,7 +149,6 @@ def check_a_query_reading_no_table_is_refused(ctx):
     """
     r = validate.check(ctx.con, _tables(ctx), "SELECT 42")
     eq(r.codes(), ("no_relation",), "codes")
-
 
 def check_cross_join_is_refused(ctx):
     """Asserts the detail, not just the code.
@@ -182,12 +167,10 @@ def check_cross_join_is_refused(ctx):
         eq(r.findings[0].detail, "explicit cross join over warehouse tables",
            "detail names the cross join branch")
 
-
 def check_natural_join_is_refused(ctx):
     sql = "SELECT 1 FROM retail.dim_customer NATURAL JOIN retail.fct_order_header"
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("implicit_join" in r.codes(), "codes %s" % (r.codes(),))
-
 
 def check_a_join_condition_that_does_not_relate_its_sides_is_caught(ctx):
     """The join runs and returns a cartesian product wearing an ON clause."""
@@ -198,7 +181,6 @@ def check_a_join_condition_that_does_not_relate_its_sides_is_caught(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unrelated_join" in r.codes(), "codes %s" % (r.codes(),))
 
-
 def check_using_is_accepted(ctx):
     sql = (
         "SELECT COUNT(*) FROM retail.dim_customer "
@@ -206,7 +188,6 @@ def check_using_is_accepted(ctx):
     )
     r = validate.check(ctx.con, _tables(ctx), sql)
     true(r.ok, "USING names the key: %s" % (r.codes(),))
-
 
 def check_a_cte_name_is_not_reported_as_an_unknown_table(ctx):
     sql = (
@@ -216,12 +197,10 @@ def check_a_cte_name_is_not_reported_as_an_unknown_table(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unknown_table" not in r.codes(), "codes %s" % (r.codes(),))
 
-
 def check_unparseable_sql_comes_back_as_a_finding_not_an_exception(ctx):
     r = validate.check(ctx.con, _tables(ctx), "SELECT FROM WHERE")
     eq(r.codes(), ("unparseable",), "codes")
     eq(r.ok, False, "not ok")
-
 
 def check_report_serialises_for_the_trace(ctx):
     import json
@@ -235,14 +214,12 @@ def check_report_serialises_for_the_trace(ctx):
     )
     eq(payload["findings"][0]["code"], "no_relation", "finding code survives")
 
-
-# --- the self join false refusal -----------------------------------------------------
+# the self join false refusal
 #
 # `unrelated_join` counted distinct real tables until today, so a self join resolved both
 # aliases to one table and every self join was refused. No gold query self joins, so the
 # answer key check stayed green while it shipped. Both shapes below fail against the
 # unfixed rule, checked by reverting it in a scratch copy before these were committed.
-
 
 def check_a_self_join_with_the_ordering_in_the_on_clause_is_allowed(ctx):
     """The repeat purchase question. Two aliases of one table, related to each other."""
@@ -254,7 +231,6 @@ def check_a_self_join_with_the_ordering_in_the_on_clause_is_allowed(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     eq(r.ok, True, "findings %s" % (r.codes(),))
 
-
 def check_a_self_join_with_the_ordering_in_a_where_clause_is_allowed(ctx):
     """Same query, written the other way. The condition is thinner and still relates."""
     sql = (
@@ -265,7 +241,6 @@ def check_a_self_join_with_the_ordering_in_a_where_clause_is_allowed(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     eq(r.ok, True, "findings %s" % (r.codes(),))
 
-
 def check_a_join_condition_touching_one_side_is_still_refused(ctx):
     """The rule still has to do its job. Counting aliases must not widen it to nothing."""
     sql = (
@@ -275,7 +250,6 @@ def check_a_join_condition_touching_one_side_is_still_refused(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unrelated_join" in r.codes(), "codes %s" % (r.codes(),))
 
-
 def check_a_constant_join_condition_is_still_refused(ctx):
     """`ON 1 = 1` names no relation at all and is a cross join wearing an ON clause."""
     sql = (
@@ -284,7 +258,6 @@ def check_a_constant_join_condition_is_still_refused(ctx):
     )
     r = validate.check(ctx.con, _tables(ctx), sql)
     true("unrelated_join" in r.codes(), "codes %s" % (r.codes(),))
-
 
 def check_a_join_to_a_cte_is_allowed(ctx):
     """Found by a surviving mutant, not by anyone reading the rule.
@@ -302,7 +275,6 @@ def check_a_join_to_a_cte_is_allowed(ctx):
     r = validate.check(ctx.con, _tables(ctx), sql)
     eq(r.ok, True, "findings %s" % (r.codes(),))
     eq(len(ctx.con.execute(sql).fetchall()), 5, "and the query really runs")
-
 
 def check_a_join_to_a_derived_table_is_allowed(ctx):
     """Same defect, reached through a subquery in the FROM clause instead of a CTE."""

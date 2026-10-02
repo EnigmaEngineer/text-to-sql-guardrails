@@ -35,14 +35,12 @@ from dataclasses import dataclass
 REVISE = "revise"
 STOP = "stop"
 
-
 @dataclass(frozen=True)
 class Strategy:
     action: str
     novel: bool
     instruction: str
     why: str = ""
-
 
 @dataclass(frozen=True)
 class Correction:
@@ -63,12 +61,10 @@ class Correction:
             "text": self.text,
         }
 
-
 # Keyed by the refusal code exactly as the layer that produced it wrote it. `novel` is a
 # claim about the prompt, so it is asserted per code and checked in the tests against
 # `agent.prompt.RULES` and against whether the schema alone answers it.
 STRATEGY = {
-    # --- agent.role, the parser gate -------------------------------------------------
     "empty": Strategy(
         REVISE, False,
         "Your reply contained no SQL statement. Reply with exactly one SELECT.",
@@ -90,7 +86,6 @@ STRATEGY = {
         "",
         "chained statements are the exfiltration shape the gate measured. Not coached.",
     ),
-    # --- agent.validate, static validation --------------------------------------------
     "table_function": Strategy(
         STOP, False,
         "",
@@ -123,7 +118,6 @@ STRATEGY = {
         "{detail}. Give the join a condition relating a column of one side to a column "
         "of the other.",
     ),
-    # --- agent.cost, the ceiling -------------------------------------------------------
     "over_ceiling": Strategy(
         REVISE, True,
         "This query is too expensive to run. {detail}. Narrow it with a filter, an "
@@ -163,10 +157,8 @@ OUTCOME_STRATEGY = {
 
 NOVEL_CODES = tuple(sorted(c for c, s in STRATEGY.items() if s.novel))
 
-
 class NoStrategy(KeyError):
     """A refusal code with no entry. Loud on purpose, see the module docstring."""
-
 
 def strategy_for(attempt):
     """Which strategy applies. Raises rather than guessing at an unknown code."""
@@ -189,7 +181,6 @@ def strategy_for(attempt):
             "rather than letting the loop decide by default." % code
         )
     return STRATEGY[code]
-
 
 def correction_for(attempt):
     """The correction to send back, or one carrying `action == STOP`.
@@ -216,7 +207,6 @@ def correction_for(attempt):
     if strategy.action == REVISE:
         text = strategy.instruction.format(detail=detail.rstrip("."))
     return Correction(code=code, action=strategy.action, novel=strategy.novel, text=text)
-
 
 def render(correction):
     """The block that goes into the next prompt.
