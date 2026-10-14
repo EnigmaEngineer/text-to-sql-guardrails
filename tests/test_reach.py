@@ -108,7 +108,7 @@ def check_the_real_measurement_still_says_pii_runs(ctx):
     """The finding this file exists to protect, asserted against the live guard.
 
     Nothing in this project stops a query reading PII. If a later change
-    makes that false, this check fails and somebody has to decide whether the thread
+    makes that false, this check fails and somebody has to decide whether the gap
     closed or whether a rule got quietly widened.
     """
     tables = catalog.read(ctx.con)

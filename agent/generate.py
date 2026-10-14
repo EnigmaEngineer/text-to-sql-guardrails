@@ -18,8 +18,8 @@ What it does not buy is an accuracy number. **A score produced with ScriptedGene
 a statement about this file and not about any model.** The scorecard needs a real backend before
 it can report accuracy, and that is tracked rather than assumed.
 
-TODO(day7): wire a real backend. Blocker is that the scheduled sandbox has no model
-access of any kind, so this has to be run on Syed's laptop with a key in the environment.
+TODO: wire a real backend. Blocker is that the sandbox I build in has no model access
+of any kind, so this has to run on my own laptop with a key in the environment.
 Until then no accuracy figure in this repo means anything about a model.
 """
 
